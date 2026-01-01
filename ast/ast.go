@@ -1,6 +1,9 @@
 package ast
 
-import "vine-lang/lexer"
+import (
+	"fmt"
+	"vine-lang/lexer"
+)
 
 type Token = lexer.Token
 
@@ -62,11 +65,13 @@ type Node interface {
 // Expr 表达式接口
 type Expr interface {
 	Node
+	String() string
 }
 
 // Stmt 语句接口
 type Stmt interface {
 	Node
+	String() string
 }
 
 // BaseNode 基础节点实现
@@ -97,6 +102,10 @@ type SwitchCase interface {
 type Literal struct {
 	BaseNode
 	Value Token
+}
+
+func (l *Literal) String() string {
+	return l.Value.String()
 }
 
 type Property struct {
@@ -160,10 +169,19 @@ type LambdaFunctionDecl struct {
 // VariableDecl
 type VariableDecl struct {
 	BaseNode
-	PreID   Token
-	ID      *Literal
+	Name    *Literal
 	Value   Expr
 	IsConst bool
+}
+
+func (v *VariableDecl) String() string {
+	var prefix string
+	if v.IsConst {
+		prefix = "const"
+	} else {
+		prefix = "let"
+	}
+	return fmt.Sprintf("%s %s = %s", prefix, v.Name.String(), v.Value)
 }
 
 // ================================== Expressions ==================================
@@ -311,6 +329,12 @@ type ProgramStmt struct {
 	Body []Stmt
 }
 
+func (p *ProgramStmt) Print() {
+	for _, stmt := range p.Body {
+		fmt.Println(stmt.String())
+	}
+}
+
 // IfStmt
 type IfStmt struct {
 	BaseNode
@@ -340,6 +364,10 @@ type SwitchStmt struct {
 type ExpressionStmt struct {
 	BaseNode
 	Expression Expr
+}
+
+func (e *ExpressionStmt) String() string {
+	return fmt.Sprintf("ExpressionStmt: %v", e.Expression)
 }
 
 // TaskStmt

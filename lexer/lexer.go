@@ -225,6 +225,20 @@ func (l *Lexer) Parse() {
 	}
 }
 
+func (l *Lexer) Tokens() []Token {
+	return l.tokens
+}
+
+func (l *Lexer) TheEof() Token {
+	var lastTk = l.tokens[len(l.tokens)-1]
+	return Token{
+		Type:  EOF,
+		Value: string(EOF),
+		Col:   lastTk.Col,
+		Line:  lastTk.Line,
+	}
+}
+
 func (l *Lexer) Print() {
 	for i := range l.tokens {
 		switch l.tokens[i].Type {
