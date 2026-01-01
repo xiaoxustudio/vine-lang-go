@@ -8,6 +8,6 @@ func IsIdentifier(s string) bool {
 }
 
 func IsDigit(s string) bool {
-	r, err := regexp.MatchString("[0-9]+", string(s))
+	r, err := regexp.MatchString("[0-9.]+", string(s))
 	return r && err == nil
 }
