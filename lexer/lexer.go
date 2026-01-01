@@ -88,7 +88,13 @@ func (l *Lexer) GetToken() (Token, error) {
 			tok = NewToken(DEC_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
-			tok = NewToken(MINUS, l.ch, l.column, l.line)
+			if utils.IsDigit(peek) {
+				l.readChar()
+				num := l.readNumber()
+				tok = NewToken(NUMBER, "-"+num, l.column, l.line)
+			} else {
+				tok = NewToken(MINUS, l.ch, l.column, l.line)
+			}
 		}
 	case "*":
 		switch peek {
