@@ -2,8 +2,8 @@ package lexer
 
 import (
 	"fmt"
-	"vine-lang/err"
 	"vine-lang/utils"
+	"vine-lang/verror"
 )
 
 type Lexer struct {
@@ -165,14 +165,13 @@ func (l *Lexer) GetToken() (Token, error) {
 			l.readChar()
 		} else {
 			// unknown \r token
-			return NewToken(ILLEGAL, l.ch, l.column, l.line), &err.VError{
-				Pos: err.Position{
+			return NewToken(ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
+				Position: verror.Position{
 					Filename: l.filename,
 					Line:     l.line,
 					Column:   l.column,
 				},
-				Char: l.ch,
-				Msg:  "the Lexer parse with expected token",
+				Message: "the Lexer parse with expected token",
 			}
 		}
 	case "\n":
@@ -206,14 +205,13 @@ func (l *Lexer) GetToken() (Token, error) {
 			tok.Line = l.line
 			return tok, nil
 		}
-		return NewToken(ILLEGAL, l.ch, l.column, l.line), &err.VError{
-			Pos: err.Position{
+		return NewToken(ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
+			Position: verror.Position{
 				Filename: l.filename,
 				Line:     l.line,
 				Column:   l.column,
 			},
-			Char: l.ch,
-			Msg:  "the Lexer parse with unknown token",
+			Message: "the Lexer parse with unknown token",
 		}
 	}
 	l.readChar() // 移动到下一个字符

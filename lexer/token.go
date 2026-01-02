@@ -1,6 +1,9 @@
 package lexer
 
-import "fmt"
+import (
+	"fmt"
+	"vine-lang/verror"
+)
 
 type TokenType string
 
@@ -119,6 +122,10 @@ func (t Token) String() string {
 		return fmt.Sprintf("Token{NEWLINE(\\n), %d, %d}", t.Line, t.Column)
 	}
 	return fmt.Sprintf("Token{%s(%s), %d, %d}", t.Type, t.Value, t.Line, t.Column)
+}
+
+func (t Token) ToPosition(fname string) verror.Position {
+	return verror.Position{Filename: fname, Line: t.Line, Column: t.Column}
 }
 
 func LookupIdent(ident string) TokenType {

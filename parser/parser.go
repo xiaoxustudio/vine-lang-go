@@ -5,28 +5,22 @@ import (
 	"slices"
 	"vine-lang/ast"
 	"vine-lang/lexer"
+	"vine-lang/verror"
 )
 
 type Token = lexer.Token
-type ParseError struct {
-	Line    int
-	Column  int
-	Message string
-}
+
 type Parser struct {
 	lexer    *lexer.Lexer
 	tokens   []Token
 	position int
-	errors   []ParseError // 收集所有错误
+	errors   []verror.ParseVError // 收集所有错误
 	ast      *ast.ProgramStmt
-}
-
-func (e ParseError) Error() string {
-	return fmt.Sprintf("[Line %d, Column %d] Error: %s", e.Line, e.Column, e.Message)
+	handlers map[lexer.TokenType][]func(p *Parser) any
 }
 
 func New(lex *lexer.Lexer) *Parser {
-	p := &Parser{lexer: lex, tokens: []Token{}, position: 0, errors: []ParseError{}}
+	p := &Parser{lexer: lex, tokens: []Token{}, position: 0, errors: []verror.ParseVError{}, handlers: make(map[lexer.TokenType][]func(p *Parser) any)}
 	// 移除不进行解析的token
 	for _, token := range lex.Tokens() {
 		if slices.Contains([]lexer.TokenType{lexer.WHITESPACE, lexer.NEWLINE}, token.Type) {
@@ -37,7 +31,14 @@ func New(lex *lexer.Lexer) *Parser {
 	return p
 }
 
-func (p *Parser) GetErrors() []ParseError {
+func (p *Parser) RegisterStmtHandler(kw lexer.TokenType, fn func(p *Parser) any) {
+	if p.handlers[kw] == nil {
+		p.handlers[kw] = make([]func(p *Parser) any, 0)
+	}
+	p.handlers[kw] = append(p.handlers[kw], fn)
+}
+
+func (p *Parser) GetErrors() []verror.ParseVError {
 	return p.errors
 }
 
@@ -78,9 +79,9 @@ func (p *Parser) isEof() bool {
 
 func (p *Parser) errorf(token Token, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
-	err := ParseError{
-		Line:    token.Line,
-		Column:  token.Column,
+	err := verror.ParseVError{
+		Position: verror.Position{Line: token.Line,
+			Column: token.Column},
 		Message: msg,
 	}
 	panic(err)
@@ -130,7 +131,7 @@ func (p *Parser) ParseProgram() *ast.ProgramStmt {
 func (p *Parser) parseStatementSafe() ast.Stmt {
 	defer func() {
 		if r := recover(); r != nil {
-			if parseErr, ok := r.(ParseError); ok {
+			if parseErr, ok := r.(verror.ParseVError); ok {
 				p.errors = append(p.errors, parseErr)
 				fmt.Printf("Caught Error: %v\n", parseErr)
 			} else {
@@ -156,36 +157,25 @@ func (p *Parser) synchronize() {
 
 func (p *Parser) parseStatement() ast.Stmt {
 	tk := p.peek()
-	switch tk.Type {
-	case lexer.LET:
-		return p.parseLetStatement()
-	default:
-		return p.parseExpressionStatement()
+	for handlers, ok := p.handlers[tk.Type]; ok; {
+		for _, handler := range handlers {
+			res := handler(p)
+			if stmt, ok := res.(ast.Stmt); ok {
+				return stmt
+			}
+			if _, ok := res.(error); ok {
+				continue
+			}
+		}
 	}
-}
-
-func (p *Parser) parseLetStatement() *ast.VariableDecl {
-	startToken := p.advance()
-	isConst := startToken.Type == lexer.CST
-
-	idTk := p.expect(lexer.IDENT)
-
-	id := &ast.Literal{Value: idTk}
-	p.expect(lexer.ASSIGN)
-
-	value := p.parseExpression()
-
-	return &ast.VariableDecl{
-		Name:    id,
-		Value:   value,
-		IsConst: isConst,
-	}
+	return p.parseExpressionStatement()
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStmt {
 	return &ast.ExpressionStmt{Expression: p.parseExpression()}
 }
 
+/* Expr */
 func (p *Parser) parseExpression() ast.Expr {
 	return p.parseBinaryExpression()
 }
@@ -211,6 +201,11 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 	case lexer.IDENT, lexer.STRING, lexer.NUMBER:
 		p.advance()
 		return p.createLiteral(tk)
+	case lexer.LPAREN:
+		p.advance()
+		expr := p.parseExpression()
+		p.expect(lexer.RPAREN)
+		return expr
 	case lexer.NEWLINE, lexer.WHITESPACE:
 		p.advance()
 		return p.parsePrimaryExpression()

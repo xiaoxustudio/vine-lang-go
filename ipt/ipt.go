@@ -2,28 +2,23 @@ package ipt
 
 import (
 	"fmt"
-	"strconv"
 	"vine-lang/ast"
 	"vine-lang/env"
 	"vine-lang/lexer"
+	"vine-lang/libs/global"
 	"vine-lang/parser"
+	"vine-lang/verror"
 )
 
-type InterpreterError struct {
-	Line    int
-	Column  int
-	Message string
-}
-
 type Interpreter struct {
-	errors []InterpreterError
+	errors []verror.InterpreterVError
 	p      *parser.Parser
 	env    *env.Environment
 }
 
 func New(p *parser.Parser, env *env.Environment) *Interpreter {
 	return &Interpreter{
-		errors: make([]InterpreterError, 0),
+		errors: make([]verror.InterpreterVError, 0),
 		p:      p,
 		env:    env,
 	}
@@ -45,36 +40,79 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 		return n.Value
 	case *ast.BinaryExpr:
 		{
-			left := i.Eval(n.Left, env).(Token)
-			right := i.Eval(n.Right, env).(Token)
-			if left.Type != lexer.NUMBER || right.Type != lexer.NUMBER {
-				panic(InterpreterError{
-					Line:    n.Operator.Line,
-					Column:  n.Operator.Column,
-					Message: "Both sides of the operator must be numbers",
+			leftRaw := i.Eval(n.Left, env)
+			rightRaw := i.Eval(n.Right, env)
+
+			leftVal, isLeftInt, err := global.GetNumberAndType(leftRaw)
+			if err != nil {
+				panic(verror.InterpreterVError{
+					Message: err.Error(),
+					Position: verror.Position{
+						Column: n.Operator.Column,
+						Line:   n.Operator.Line,
+					},
 				})
 			}
 
-			leftValue, err := strconv.ParseFloat(left.Value, 64)
+			rightVal, isRightInt, err := global.GetNumberAndType(rightRaw)
 			if err != nil {
-				panic(err)
+				panic(verror.InterpreterVError{
+					Position: verror.Position{
+						Column: n.Operator.Column,
+						Line:   n.Operator.Line,
+					},
+					Message: err.Error(),
+				})
 			}
 
-			rightValue, err := strconv.ParseFloat(right.Value, 64)
-			if err != nil {
-				panic(err)
+			var result any
+
+			if isLeftInt && isRightInt {
+				lInt := int64(leftVal)
+				rInt := int64(rightVal)
+
+				switch n.Operator.Type {
+				case lexer.PLUS:
+					result = lInt + rInt
+				case lexer.MINUS:
+					result = lInt - rInt
+				case lexer.MUL:
+					result = lInt * rInt
+				case lexer.DIV:
+					if rInt == 0 {
+						panic(verror.InterpreterVError{
+							Position: verror.Position{
+								Column: n.Operator.Column,
+								Line:   n.Operator.Line,
+							},
+							Message: "Divide by zero",
+						})
+					}
+					result = lInt / rInt
+				}
+			} else {
+				switch n.Operator.Type {
+				case lexer.PLUS:
+					result = leftVal + rightVal
+				case lexer.MINUS:
+					result = leftVal - rightVal
+				case lexer.MUL:
+					result = leftVal * rightVal
+				case lexer.DIV:
+					if rightVal == 0 {
+						panic(verror.InterpreterVError{
+							Position: verror.Position{
+								Column: n.Operator.Column,
+								Line:   n.Operator.Line,
+							},
+							Message: "Divide by zero",
+						})
+					}
+					result = leftVal / rightVal
+				}
 			}
 
-			switch n.Operator.Type {
-			case lexer.PLUS:
-				return leftValue + rightValue
-			case lexer.MINUS:
-				return leftValue - rightValue
-			case lexer.MUL:
-				return leftValue * rightValue
-			case lexer.DIV:
-				return leftValue / rightValue
-			}
+			return result
 		}
 	}
 	return nil
@@ -83,7 +121,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 func (i *Interpreter) EvalSafe() any {
 	defer func() {
 		if r := recover(); r != nil {
-			if parseErr, ok := r.(InterpreterError); ok {
+			if parseErr, ok := r.(verror.InterpreterVError); ok {
 				i.errors = append(i.errors, parseErr)
 				fmt.Printf("Caught Error: %v\n", parseErr)
 			} else {

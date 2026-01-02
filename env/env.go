@@ -1,27 +1,63 @@
 package env
 
 import (
+	"fmt"
 	"vine-lang/lexer"
 	"vine-lang/libs/global"
+	"vine-lang/verror"
 )
 
 type Token = lexer.Token
 
 type Environment struct {
-	store map[Token]any
+	parent   *Environment
+	store    map[Token]any
+	FileName string
 }
 
-func New() *Environment {
-	return &Environment{store: make(map[Token]any)}
+func New(fileName string) *Environment {
+	return &Environment{parent: nil, store: make(map[Token]any), FileName: fileName}
+}
+
+func (e *Environment) Lookup(name Token) (any, bool) {
+	return e.Get(name)
 }
 
 func (e *Environment) Get(name Token) (any, bool) {
-	val, ok := e.store[name]
-	return val, ok
+	for k := range e.store {
+		if k.Value == name.Value {
+			return e.store[k], true
+		}
+	}
+	if e.parent != nil {
+		return e.parent.Get(name)
+	} else {
+		return nil, false
+	}
+}
+
+func (e *Environment) GetKey(name Token) (Token, bool) {
+	for k := range e.store {
+		if k.Value == name.Value {
+			return k, true
+		}
+	}
+	if e.parent != nil {
+		return e.parent.GetKey(name)
+	} else {
+		return Token{}, false
+	}
 }
 
 func (e *Environment) Set(name Token, val any) {
-	e.store[name] = val
+	if _, ok := e.GetKey(name); !ok {
+		e.store[name] = val
+	} else {
+		panic(&verror.InterpreterVError{
+			Position: name.ToPosition(e.FileName),
+			Message:  fmt.Sprintf("variable %s is defined , can't be redefined", global.TrasformPrintString(name.Value)),
+		})
+	}
 }
 
 func (e *Environment) Delete(name Token) {

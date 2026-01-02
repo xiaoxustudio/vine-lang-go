@@ -1,6 +1,8 @@
 package utils
 
-import "regexp"
+import (
+	"regexp"
+)
 
 func IsIdentifier(s string) bool {
 	r, err := regexp.MatchString("[\u4e00-\u9fa5a-zA-Z_]", string(s))
