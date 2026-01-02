@@ -30,8 +30,11 @@ func (l *Lexer) readChar() {
 	if l.isEof() {
 		l.ch = string(EOF)
 	} else {
+		if l.ch != "\n" {
+			// 不是换行符，则列数加1
+			l.column += 1
+		}
 		l.position += 1
-		l.column += 1
 		l.ch = string(l.input[l.position])
 	}
 }
