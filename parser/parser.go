@@ -24,8 +24,15 @@ func (e ParseError) Error() string {
 	return fmt.Sprintf("[Line %d, Column %d] Error: %s", e.Line, e.Column, e.Message)
 }
 
-func New(lexer *lexer.Lexer) *Parser {
-	p := &Parser{lexer: lexer, tokens: lexer.Tokens(), position: 0, errors: []ParseError{}}
+func New(lex *lexer.Lexer) *Parser {
+	p := &Parser{lexer: lex, tokens: []Token{}, position: 0, errors: []ParseError{}}
+	// 移除不进行解析的token
+	for _, token := range lex.Tokens() {
+		if slices.Contains([]lexer.TokenType{lexer.WHITESPACE, lexer.NEWLINE}, token.Type) {
+			continue
+		}
+		p.tokens = append(p.tokens, token)
+	}
 	return p
 }
 
@@ -68,7 +75,7 @@ func (p *Parser) isEof() bool {
 	return p.position >= len(p.tokens)
 }
 
-func (p *Parser) errorf(token Token, format string, args ...interface{}) {
+func (p *Parser) errorf(token Token, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	err := ParseError{
 		Line:    token.Line,
@@ -161,15 +168,12 @@ func (p *Parser) parseLetStatement() *ast.VariableDecl {
 	isConst := startToken.Type == lexer.CST
 
 	idTk := p.expect(lexer.IDENT)
-	id := &ast.Literal{Value: idTk}
 
+	id := &ast.Literal{Value: idTk}
 	p.expect(lexer.ASSIGN)
 
 	value := p.parseExpression()
 
-	if p.advance().Type == lexer.SEMICOLON {
-		p.expect(lexer.SEMICOLON)
-	}
 	return &ast.VariableDecl{
 		Name:    id,
 		Value:   value,
@@ -182,11 +186,26 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStmt {
 }
 
 func (p *Parser) parseExpression() ast.Expr {
-	return p.parsePrimaryExpression()
+	return p.parseBinaryExpression()
+}
+
+func (p *Parser) parseBinaryExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	opMap := []lexer.TokenType{lexer.PLUS, lexer.MINUS, lexer.ASTERISK, lexer.SLASH}
+	left := p.parsePrimaryExpression()
+	if slices.Contains(opMap, p.peek().Type) {
+		op := p.advance()
+		right := p.parseBinaryExpression()
+		return &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+	}
+	return left
 }
 
 func (p *Parser) parsePrimaryExpression() ast.Expr {
 	tk := p.peek()
+
 	switch tk.Type {
 	case lexer.IDENT, lexer.STRING, lexer.NUMBER:
 		p.advance()

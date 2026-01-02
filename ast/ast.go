@@ -261,6 +261,10 @@ type BinaryExpr struct {
 	Operator Token
 }
 
+func (b *BinaryExpr) String() string {
+	return fmt.Sprintf("BinaryExpr(%s %s %s)", b.Left, b.Operator.String(), b.Right)
+}
+
 // ToExpr
 type ToExpr struct {
 	BaseNode
