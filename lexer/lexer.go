@@ -105,7 +105,7 @@ func (l *Lexer) GetToken() (Token, error) {
 			tok = NewToken(MUL_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
-			tok = NewToken(ASTERISK, l.ch, l.column, l.line)
+			tok = NewToken(MUL, l.ch, l.column, l.line)
 		}
 	case "/":
 		switch peek {
@@ -113,7 +113,7 @@ func (l *Lexer) GetToken() (Token, error) {
 			tok = NewToken(DIV_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
-			tok = NewToken(SLASH, l.ch, l.column, l.line)
+			tok = NewToken(DIV, l.ch, l.column, l.line)
 		}
 	case "=":
 		if peek == "=" {
@@ -196,13 +196,13 @@ func (l *Lexer) GetToken() (Token, error) {
 				tok.Type = FALSE
 			}
 			tok.Type = LookupIdent(tok.Value)
-			tok.Col = l.column
+			tok.Column = l.column
 			tok.Line = l.line
 			return tok, nil
 		} else if utils.IsDigit(l.ch) {
 			tok.Value = l.readNumber()
 			tok.Type = NUMBER
-			tok.Col = l.column
+			tok.Column = l.column
 			tok.Line = l.line
 			return tok, nil
 		}
@@ -237,10 +237,10 @@ func (l *Lexer) Tokens() []Token {
 func (l *Lexer) TheEof() Token {
 	var lastTk = l.tokens[len(l.tokens)-1]
 	return Token{
-		Type:  EOF,
-		Value: string(EOF),
-		Col:   lastTk.Col,
-		Line:  lastTk.Line,
+		Type:   EOF,
+		Value:  string(EOF),
+		Column: lastTk.Column,
+		Line:   lastTk.Line,
 	}
 }
 

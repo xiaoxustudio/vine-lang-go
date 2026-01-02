@@ -18,6 +18,7 @@ type Parser struct {
 	tokens   []Token
 	position int
 	errors   []ParseError // 收集所有错误
+	ast      *ast.ProgramStmt
 }
 
 func (e ParseError) Error() string {
@@ -79,7 +80,7 @@ func (p *Parser) errorf(token Token, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	err := ParseError{
 		Line:    token.Line,
-		Column:  token.Col,
+		Column:  token.Column,
 		Message: msg,
 	}
 	panic(err)
@@ -122,7 +123,7 @@ func (p *Parser) ParseProgram() *ast.ProgramStmt {
 			program.Body = append(program.Body, stmt)
 		}
 	}
-
+	p.ast = program
 	return program
 }
 
@@ -193,7 +194,7 @@ func (p *Parser) parseBinaryExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	opMap := []lexer.TokenType{lexer.PLUS, lexer.MINUS, lexer.ASTERISK, lexer.SLASH}
+	opMap := []lexer.TokenType{lexer.PLUS, lexer.MINUS, lexer.DIV, lexer.MUL}
 	left := p.parsePrimaryExpression()
 	if slices.Contains(opMap, p.peek().Type) {
 		op := p.advance()

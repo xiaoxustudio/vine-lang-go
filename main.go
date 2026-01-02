@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"vine-lang/env"
+	"vine-lang/ipt"
 	"vine-lang/lexer"
 	"vine-lang/parser"
 )
@@ -11,5 +13,8 @@ func main() {
 	var lex = lexer.New("main.vine", string(bytes))
 	lex.Parse()
 	var p = parser.New(lex)
-	p.ParseProgram().Print()
+	var e = env.New()
+	var i = ipt.New(p, e)
+	i.EvalSafe()
+	e.Print()
 }

@@ -17,13 +17,13 @@ const (
 	STRING TokenType = "STRING"
 
 	// Operators
-	ASSIGN   TokenType = "="
-	PLUS     TokenType = "+"
-	MINUS    TokenType = "-"
-	BANG     TokenType = "!"
-	ASTERISK TokenType = "*"
-	SLASH    TokenType = "/"
-	QUOTE    TokenType = "\""
+	ASSIGN TokenType = "="
+	PLUS   TokenType = "+"
+	MINUS  TokenType = "-"
+	BANG   TokenType = "!"
+	MUL    TokenType = "*"
+	DIV    TokenType = "/"
+	QUOTE  TokenType = "\""
 
 	// Logical operators
 	AND        TokenType = "AND"
@@ -73,6 +73,7 @@ const (
 	TYPEOF   TokenType = "TYPEOF"
 	TRUE     TokenType = "TRUE"
 	FALSE    TokenType = "FALSE"
+	NULL     TokenType = "NULL"
 )
 
 var Keywords = map[string]TokenType{
@@ -94,29 +95,30 @@ var Keywords = map[string]TokenType{
 	"typeof":   TYPEOF,
 	"true":     TRUE,
 	"false":    FALSE,
+	"null":     NULL,
 }
 
 type Token struct {
-	Type  TokenType
-	Value string // 字符串原始值
-	Line  int    // 行号
-	Col   int    // 列号
+	Type   TokenType
+	Value  string // 字符串原始值
+	Line   int    // 行号
+	Column int    // 列号
 }
 
 func NewToken(t TokenType, v string, col, line int) Token {
 	return Token{
-		Type:  t,
-		Value: v,
-		Col:   col,
-		Line:  line,
+		Type:   t,
+		Value:  v,
+		Column: col,
+		Line:   line,
 	}
 }
 
 func (t Token) String() string {
 	if t.Type == NEWLINE {
-		return fmt.Sprintf("Token{NEWLINE(\\n), %d, %d}", t.Line, t.Col)
+		return fmt.Sprintf("Token{NEWLINE(\\n), %d, %d}", t.Line, t.Column)
 	}
-	return fmt.Sprintf("Token{%s(%s), %d, %d}", t.Type, t.Value, t.Line, t.Col)
+	return fmt.Sprintf("Token{%s(%s), %d, %d}", t.Type, t.Value, t.Line, t.Column)
 }
 
 func LookupIdent(ident string) TokenType {
