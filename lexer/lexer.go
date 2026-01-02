@@ -157,6 +157,8 @@ func (l *Lexer) GetToken() (Token, error) {
 	case "\r":
 		if peek == "\n" {
 			tok = NewToken(NEWLINE, l.ch, l.column, l.line)
+			l.line += 1
+			l.column = 0
 			l.readChar()
 		} else {
 			// unknown \r token
