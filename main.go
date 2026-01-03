@@ -17,7 +17,19 @@ func main() {
 				fmt.Println(err.Error())
 				return
 			}
-			fmt.Println("Internal Fatal Error:", r)
+			if err, ok := r.(verror.ParseVError); ok {
+				fmt.Println(err.Error())
+				return
+			}
+			if err, ok := r.(verror.InterpreterVError); ok {
+				fmt.Println(err.Error())
+				return
+			}
+			if err, ok := r.(verror.LexerVError); ok {
+				fmt.Println(err.Error())
+				return
+			}
+			fmt.Println(r)
 		}
 	}()
 	bytes, _ := os.ReadFile("./examples/001.vine")

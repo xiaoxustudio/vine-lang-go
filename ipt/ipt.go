@@ -32,17 +32,21 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 			lastResult = i.Eval(s, env)
 		}
 		return lastResult
+	case *ast.ExpressionStmt:
+		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:
 		val := i.Eval(n.Value, env)
-		env.Set(n.Name.Value, val)
+		env.Define(n.Name.Value, val)
 		return nil
-	case *ast.Literal:
-		return n.Value
+	case *ast.AssignmentExpr:
+		name := i.Eval(n.Left, env)
+		val := i.Eval(n.Right, env)
+		env.Set(name.(Token), val)
+		return nil
 	case *ast.BinaryExpr:
 		{
 			leftRaw := i.Eval(n.Left, env)
 			rightRaw := i.Eval(n.Right, env)
-
 			leftVal, isLeftInt, err := global.GetNumberAndType(leftRaw)
 			if err != nil {
 				panic(verror.InterpreterVError{
@@ -54,6 +58,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 				})
 			}
 
+			/* 数字转换 */
 			rightVal, isRightInt, err := global.GetNumberAndType(rightRaw)
 			if err != nil {
 				panic(verror.InterpreterVError{
@@ -114,6 +119,8 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 
 			return result
 		}
+	case *ast.Literal:
+		return n.Value
 	}
 	return nil
 }

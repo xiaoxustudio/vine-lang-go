@@ -217,12 +217,15 @@ type CallExpr struct {
 	Arguments []Expr
 }
 
-// AssignmentExpr (TS 中定义了两次，这里合并为一个)
 type AssignmentExpr struct {
 	BaseNode
-	Left     *Literal
+	Left     Expr
 	Right    Expr
 	Operator Token
+}
+
+func (a *AssignmentExpr) String() string {
+	return fmt.Sprintf("AssignmentExpr(%s %s %s)", a.Left.String(), a.Operator.String(), a.Right.String())
 }
 
 // TernaryExpr (Type: TernayExpression)

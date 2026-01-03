@@ -80,7 +80,8 @@ func (p *Parser) isEof() bool {
 func (p *Parser) errorf(token Token, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	err := verror.ParseVError{
-		Position: verror.Position{Line: token.Line,
+		Position: verror.Position{
+			Line:   token.Line,
 			Column: token.Column},
 		Message: msg,
 	}
@@ -119,40 +120,13 @@ func (p *Parser) ParseProgram() *ast.ProgramStmt {
 	program.Body = []ast.Stmt{}
 
 	for !p.isEof() {
-		stmt := p.parseStatementSafe()
+		stmt := p.parseStatement()
 		if stmt != nil {
 			program.Body = append(program.Body, stmt)
 		}
 	}
 	p.ast = program
 	return program
-}
-
-func (p *Parser) parseStatementSafe() ast.Stmt {
-	defer func() {
-		if r := recover(); r != nil {
-			if parseErr, ok := r.(verror.ParseVError); ok {
-				p.errors = append(p.errors, parseErr)
-				fmt.Printf("Caught Error: %v\n", parseErr)
-			} else {
-				panic(r)
-			}
-			p.synchronize()
-		}
-	}()
-
-	return p.parseStatement()
-}
-
-func (p *Parser) synchronize() {
-	for !p.isEof() {
-		tk := p.peek()
-		if tk.Type == lexer.SEMICOLON || tk.Type == lexer.NEWLINE {
-			p.advance()
-			return
-		}
-		p.advance()
-	}
 }
 
 func (p *Parser) parseStatement() ast.Stmt {
@@ -172,12 +146,26 @@ func (p *Parser) parseStatement() ast.Stmt {
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStmt {
-	return &ast.ExpressionStmt{Expression: p.parseExpression()}
+	expr := p.parseExpression()
+	return &ast.ExpressionStmt{Expression: expr}
 }
 
 /* Expr */
 func (p *Parser) parseExpression() ast.Expr {
-	return p.parseBinaryExpression()
+	return p.parseAssignmentExpression()
+}
+
+func (p *Parser) parseAssignmentExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseBinaryExpression()
+	if p.peek().Type == lexer.ASSIGN {
+		op := p.expect(lexer.ASSIGN)
+		right := p.parseAssignmentExpression()
+		return &ast.AssignmentExpr{Left: left, Right: right, Operator: op}
+	}
+	return left
 }
 
 func (p *Parser) parseBinaryExpression() ast.Expr {

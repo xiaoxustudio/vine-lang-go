@@ -50,13 +50,24 @@ func (e *Environment) GetKey(name Token) (Token, bool) {
 }
 
 func (e *Environment) Set(name Token, val any) {
-	if _, ok := e.GetKey(name); !ok {
+	if _, ok := e.GetKey(name); ok {
 		e.store[name] = val
 	} else {
 		panic(&verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("variable %s is defined , can't be redefined", global.TrasformPrintString(name.Value)),
+			Message:  fmt.Sprintf("variable %s is not defined", global.TrasformPrintString(name.Value)),
 		})
+	}
+}
+
+func (e *Environment) Define(name Token, val any) {
+	if _, ok := e.GetKey(name); ok {
+		panic(&verror.InterpreterVError{
+			Position: name.ToPosition(e.FileName),
+			Message:  fmt.Sprintf("variable %s is already declared", global.TrasformPrintString(name.Value)),
+		})
+	} else {
+		e.store[name] = val
 	}
 }
 
