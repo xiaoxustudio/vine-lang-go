@@ -128,6 +128,10 @@ func (t Token) ToPosition(fname string) verror.Position {
 	return verror.Position{Filename: fname, Line: t.Line, Column: t.Column}
 }
 
+func (t Token) IsEmpty() bool {
+	return t == (Token{})
+}
+
 func LookupIdent(ident string) TokenType {
 	if tok, ok := Keywords[ident]; ok {
 		return tok

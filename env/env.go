@@ -19,10 +19,6 @@ func New(fileName string) *Environment {
 	return &Environment{parent: nil, store: make(map[Token]any), FileName: fileName}
 }
 
-func (e *Environment) Lookup(name Token) (any, bool) {
-	return e.Get(name)
-}
-
 func (e *Environment) Get(name Token) (any, bool) {
 	for k := range e.store {
 		if k.Value == name.Value {
@@ -36,22 +32,22 @@ func (e *Environment) Get(name Token) (any, bool) {
 	}
 }
 
-func (e *Environment) GetKey(name Token) (Token, bool) {
+func (e *Environment) Lookup(name Token) (Environment, Token) {
 	for k := range e.store {
 		if k.Value == name.Value {
-			return k, true
+			return *e, k
 		}
 	}
 	if e.parent != nil {
-		return e.parent.GetKey(name)
-	} else {
-		return Token{}, false
+		return e.parent.Lookup(name)
 	}
+	return Environment{}, Token{}
 }
 
 func (e *Environment) Set(name Token, val any) {
-	if _, ok := e.GetKey(name); ok {
-		e.store[name] = val
+	theEnv, tk := e.Lookup(name)
+	if !tk.IsEmpty() {
+		theEnv.store[tk] = val
 	} else {
 		panic(&verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
@@ -61,7 +57,8 @@ func (e *Environment) Set(name Token, val any) {
 }
 
 func (e *Environment) Define(name Token, val any) {
-	if _, ok := e.GetKey(name); ok {
+	_, tk := e.Lookup(name)
+	if !tk.IsEmpty() {
 		panic(&verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
 			Message:  fmt.Sprintf("variable %s is already declared", global.TrasformPrintString(name.Value)),
