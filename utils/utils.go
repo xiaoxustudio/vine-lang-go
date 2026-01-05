@@ -1,15 +1,11 @@
 package utils
 
-import (
-	"regexp"
-)
+import "unicode"
 
-func IsIdentifier(s string) bool {
-	r, err := regexp.MatchString("[\u4e00-\u9fa5a-zA-Z_]", string(s))
-	return r && err == nil
+func IsIdentifier(ch rune) bool {
+	return unicode.IsLetter(ch) || ch == '_'
 }
 
-func IsDigit(s string) bool {
-	r, err := regexp.MatchString("[0-9.]+", string(s))
-	return r && err == nil
+func IsDigit(ch rune) bool {
+	return unicode.IsDigit(ch)
 }

@@ -2,6 +2,7 @@ package lexer
 
 import (
 	"fmt"
+	"unicode/utf8"
 	"vine-lang/utils"
 	"vine-lang/verror"
 )
@@ -11,32 +12,52 @@ type Lexer struct {
 	position int // current position in input (points to current char)
 	column   int // current column in input
 	line     int // current line in input
-	ch       string
+	ch       rune
+	chWidth  int     // width of current rune in bytes
 	tokens   []Token // list of tokens
 	filename string
 }
 
 func New(filename string, input string) *Lexer {
-	l := &Lexer{input: input + "\n", filename: filename, line: 1, position: -1}
-	l.readChar()
+	l := &Lexer{input: input, filename: filename, line: 1, position: 0}
+	l.readChar() // Initialize l.ch to the first character
 	return l
 }
 
 func (l *Lexer) isEof() bool {
-	return l.position >= len(l.input)-1
+	return l.position >= len(l.input)
 }
 
 func (l *Lexer) readChar() {
-	if l.isEof() {
-		l.ch = string(EOF)
-	} else {
-		if l.ch != "\n" {
-			// 不是换行符，则列数加1
-			l.column += 1
-		}
-		l.position += 1
-		l.ch = string(l.input[l.position])
+	if l.chWidth > 0 {
+		l.position += l.chWidth
 	}
+
+	if l.position >= len(l.input) {
+		l.ch = 0
+		l.chWidth = 0
+		return
+	}
+
+	l.ch, l.chWidth = utf8.DecodeRuneInString(l.input[l.position:])
+
+	if l.ch == '\n' {
+		l.line += 1
+		l.column = 0
+	} else {
+		l.column += 1
+	}
+}
+
+func (l *Lexer) peekRune() rune {
+	nextPos := l.position + l.chWidth
+	if nextPos >= len(l.input) {
+		return 0
+	}
+
+	// 只解码，不移动指针
+	r, _ := utf8.DecodeRuneInString(l.input[nextPos:])
+	return r
 }
 
 func (l *Lexer) readIdentifier() string {
@@ -57,108 +78,115 @@ func (l *Lexer) readNumber() string {
 
 func (l *Lexer) GetToken() (Token, error) {
 	var tok Token
-	var peek string = ""
-	if !l.isEof() {
-		peek = string(l.input[l.position+1])
-	}
-
 	switch l.ch {
-	case ",":
+	case ',':
 		tok = NewToken(COMMA, l.ch, l.column, l.line)
-	case ":":
+	case ':':
 		tok = NewToken(COLON, l.ch, l.column, l.line)
-	case ".":
+	case '.':
 		tok = NewToken(DOT, l.ch, l.column, l.line)
-	case "?":
+	case '?':
 		tok = NewToken(QUESTION, l.ch, l.column, l.line)
-	case "+":
+	case '+':
+		peek := l.peekRune()
 		switch peek {
-		case "+":
+		case '+':
 			tok = NewToken(INC, l.ch+peek, l.column, l.line)
 			l.readChar()
-		case "=":
+		case '=':
 			tok = NewToken(INC_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
 			tok = NewToken(PLUS, l.ch, l.column, l.line)
 		}
-	case "-":
+	case '-':
+		peek := l.peekRune()
 		switch peek {
-		case "-":
+		case '-':
 			tok = NewToken(DEC, l.ch+peek, l.column, l.line)
 			l.readChar()
-		case "=":
+		case '=':
 			tok = NewToken(DEC_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
 			if utils.IsDigit(peek) {
 				l.readChar()
 				num := l.readNumber()
-				tok = NewToken(NUMBER, "-"+num, l.column, l.line)
+				tok.Value = "-" + num
+				tok.Column = l.column
+				tok.Line = l.line
+				tok.Type = NUMBER
 			} else {
 				tok = NewToken(MINUS, l.ch, l.column, l.line)
 			}
 		}
-	case "*":
+	case '*':
+		peek := l.peekRune()
 		switch peek {
-		case "=":
+		case '=':
 			tok = NewToken(MUL_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
 			tok = NewToken(MUL, l.ch, l.column, l.line)
 		}
-	case "/":
+	case '/':
+		peek := l.peekRune()
 		switch peek {
-		case "=":
+		case '=':
 			tok = NewToken(DIV_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
 			tok = NewToken(DIV, l.ch, l.column, l.line)
 		}
-	case "=":
-		if peek == "=" {
+	case '=':
+		peek := l.peekRune()
+		if peek == '=' {
 			tok = NewToken(EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
 			tok = NewToken(ASSIGN, l.ch, l.column, l.line)
 		}
-	case "!":
-		if peek == "=" {
+	case '!':
+		peek := l.peekRune()
+		if peek == '=' {
 			tok = NewToken(NOT_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
 			tok = NewToken(BANG, l.ch, l.column, l.line)
 		}
-	case "<":
-		if peek == "=" {
+	case '<':
+		peek := l.peekRune()
+		if peek == '=' {
 			tok = NewToken(LESS_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
 			tok = NewToken(LESS, l.ch, l.column, l.line)
 		}
-	case ">":
-		if peek == "=" {
+	case '>':
+		peek := l.peekRune()
+		if peek == '=' {
 			tok = NewToken(GREATER_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
 			tok = NewToken(GREATER, l.ch, l.column, l.line)
 		}
-	case "(":
+	case '(':
 		tok = NewToken(LPAREN, l.ch, l.column, l.line)
-	case ")":
+	case ')':
 		tok = NewToken(RPAREN, l.ch, l.column, l.line)
-	case "{":
+	case '{':
 		tok = NewToken(LBRACE, l.ch, l.column, l.line)
-	case "}":
+	case '}':
 		tok = NewToken(RBRACE, l.ch, l.column, l.line)
-	case ";":
+	case ';':
 		tok = NewToken(SEMICOLON, l.ch, l.column, l.line)
-	case " ":
+	case ' ':
 		tok = NewToken(WHITESPACE, l.ch, l.column, l.line)
-	case "\t":
+	case '\t':
 		tok = NewToken(WHITESPACE, l.ch, l.column, l.line)
-	case "\r":
-		if peek == "\n" {
+	case '\r':
+		peek := l.peekRune()
+		if peek == '\n' {
 			tok = NewToken(NEWLINE, l.ch, l.column, l.line)
 			l.line += 1
 			l.column = 0
@@ -174,17 +202,20 @@ func (l *Lexer) GetToken() (Token, error) {
 				Message: "the Lexer parse with expected token",
 			}
 		}
-	case "\n":
+	case '\n':
 		tok = NewToken(NEWLINE, l.ch, l.column, l.line)
 		l.line += 1
 		l.column = 0
-	case "\"":
+	case '"':
 		pos := l.position
 		l.readChar()
-		for l.ch != "\"" {
+		for l.ch != '"' {
 			l.readChar()
 		}
-		tok = NewToken(STRING, l.input[pos:l.position], l.column, l.line)
+		tok.Value = l.input[pos:l.position]
+		tok.Column = l.column
+		tok.Line = l.line
+		tok.Type = STRING
 	default:
 		if utils.IsIdentifier(l.ch) {
 			tok.Value = l.readIdentifier()
@@ -211,10 +242,10 @@ func (l *Lexer) GetToken() (Token, error) {
 				Line:     l.line,
 				Column:   l.column,
 			},
-			Message: "the Lexer parse with unknown token",
+			Message: fmt.Sprintf("the Lexer parse with unexpected token: %q", l.ch),
 		}
 	}
-	l.readChar() // 移动到下一个字符
+	l.readChar()
 	return tok, nil
 }
 

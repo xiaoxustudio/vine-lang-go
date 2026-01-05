@@ -108,10 +108,10 @@ type Token struct {
 	Column int    // 列号
 }
 
-func NewToken(t TokenType, v string, col, line int) Token {
+func NewToken(t TokenType, v rune, col, line int) Token {
 	return Token{
 		Type:   t,
-		Value:  v,
+		Value:  string(v),
 		Column: col,
 		Line:   line,
 	}
