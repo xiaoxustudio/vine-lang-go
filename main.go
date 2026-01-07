@@ -40,5 +40,5 @@ func main() {
 	var e = env.New("main.vine")
 	var i = ipt.New(p, e)
 	i.EvalSafe()
-	e.Print()
+	// e.Print()
 }

@@ -1,7 +1,8 @@
-package lexer
+package token
 
 import (
 	"fmt"
+	"strings"
 	"vine-lang/verror"
 )
 
@@ -77,6 +78,10 @@ const (
 	TRUE     TokenType = "TRUE"
 	FALSE    TokenType = "FALSE"
 	NULL     TokenType = "NULL"
+	PICK     TokenType = "PICK"
+
+	/* Inside Tag */
+	Module TokenType = "__Module_TAG__"
 )
 
 var Keywords = map[string]TokenType{
@@ -133,7 +138,7 @@ func (t Token) IsEmpty() bool {
 }
 
 func LookupIdent(ident string) TokenType {
-	if tok, ok := Keywords[ident]; ok {
+	if tok, ok := Keywords[strings.ToLower(ident)]; ok {
 		return tok
 	}
 	return IDENT

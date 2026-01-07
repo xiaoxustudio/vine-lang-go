@@ -3,9 +3,12 @@ package lexer
 import (
 	"fmt"
 	"unicode/utf8"
+	"vine-lang/token"
 	"vine-lang/utils"
 	"vine-lang/verror"
 )
+
+type Token = token.Token
 
 type Lexer struct {
 	input    string
@@ -77,33 +80,33 @@ func (l *Lexer) GetToken() (Token, error) {
 	var tok Token
 	switch l.ch {
 	case ',':
-		tok = NewToken(COMMA, l.ch, l.column, l.line)
+		tok = token.NewToken(token.COMMA, l.ch, l.column, l.line)
 	case ':':
-		tok = NewToken(COLON, l.ch, l.column, l.line)
+		tok = token.NewToken(token.COLON, l.ch, l.column, l.line)
 	case '.':
-		tok = NewToken(DOT, l.ch, l.column, l.line)
+		tok = token.NewToken(token.DOT, l.ch, l.column, l.line)
 	case '?':
-		tok = NewToken(QUESTION, l.ch, l.column, l.line)
+		tok = token.NewToken(token.QUESTION, l.ch, l.column, l.line)
 	case '+':
 		peek := l.peekRune()
 		switch peek {
 		case '+':
-			tok = NewToken(INC, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.INC, l.ch+peek, l.column, l.line)
 			l.readChar()
 		case '=':
-			tok = NewToken(INC_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.INC_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
-			tok = NewToken(PLUS, l.ch, l.column, l.line)
+			tok = token.NewToken(token.PLUS, l.ch, l.column, l.line)
 		}
 	case '-':
 		peek := l.peekRune()
 		switch peek {
 		case '-':
-			tok = NewToken(DEC, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.DEC, l.ch+peek, l.column, l.line)
 			l.readChar()
 		case '=':
-			tok = NewToken(DEC_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.DEC_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
 			if utils.IsDigit(peek) {
@@ -112,83 +115,83 @@ func (l *Lexer) GetToken() (Token, error) {
 				tok.Value = "-" + num
 				tok.Column = l.column
 				tok.Line = l.line
-				tok.Type = NUMBER
+				tok.Type = token.NUMBER
 			} else {
-				tok = NewToken(MINUS, l.ch, l.column, l.line)
+				tok = token.NewToken(token.MINUS, l.ch, l.column, l.line)
 			}
 		}
 	case '*':
 		peek := l.peekRune()
 		switch peek {
 		case '=':
-			tok = NewToken(MUL_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.MUL_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
-			tok = NewToken(MUL, l.ch, l.column, l.line)
+			tok = token.NewToken(token.MUL, l.ch, l.column, l.line)
 		}
 	case '/':
 		peek := l.peekRune()
 		switch peek {
 		case '=':
-			tok = NewToken(DIV_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.DIV_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		default:
-			tok = NewToken(DIV, l.ch, l.column, l.line)
+			tok = token.NewToken(token.DIV, l.ch, l.column, l.line)
 		}
 	case '=':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = NewToken(EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
-			tok = NewToken(ASSIGN, l.ch, l.column, l.line)
+			tok = token.NewToken(token.ASSIGN, l.ch, l.column, l.line)
 		}
 	case '!':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = NewToken(NOT_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.NOT_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
-			tok = NewToken(BANG, l.ch, l.column, l.line)
+			tok = token.NewToken(token.BANG, l.ch, l.column, l.line)
 		}
 	case '<':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = NewToken(LESS_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.LESS_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
-			tok = NewToken(LESS, l.ch, l.column, l.line)
+			tok = token.NewToken(token.LESS, l.ch, l.column, l.line)
 		}
 	case '>':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = NewToken(GREATER_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewToken(token.GREATER_EQ, l.ch+peek, l.column, l.line)
 			l.readChar()
 		} else {
-			tok = NewToken(GREATER, l.ch, l.column, l.line)
+			tok = token.NewToken(token.GREATER, l.ch, l.column, l.line)
 		}
 	case '(':
-		tok = NewToken(LPAREN, l.ch, l.column, l.line)
+		tok = token.NewToken(token.LPAREN, l.ch, l.column, l.line)
 	case ')':
-		tok = NewToken(RPAREN, l.ch, l.column, l.line)
+		tok = token.NewToken(token.RPAREN, l.ch, l.column, l.line)
 	case '{':
-		tok = NewToken(LBRACE, l.ch, l.column, l.line)
+		tok = token.NewToken(token.LBRACE, l.ch, l.column, l.line)
 	case '}':
-		tok = NewToken(RBRACE, l.ch, l.column, l.line)
+		tok = token.NewToken(token.RBRACE, l.ch, l.column, l.line)
 	case ';':
-		tok = NewToken(SEMICOLON, l.ch, l.column, l.line)
+		tok = token.NewToken(token.SEMICOLON, l.ch, l.column, l.line)
 	case ' ':
-		tok = NewToken(WHITESPACE, l.ch, l.column, l.line)
+		tok = token.NewToken(token.WHITESPACE, l.ch, l.column, l.line)
 	case '\t':
-		tok = NewToken(WHITESPACE, l.ch, l.column, l.line)
+		tok = token.NewToken(token.WHITESPACE, l.ch, l.column, l.line)
 	case '\r':
 		peek := l.peekRune()
 		if peek == '\n' {
-			tok = NewToken(NEWLINE, l.ch, l.column, l.line)
+			tok = token.NewToken(token.NEWLINE, l.ch, l.column, l.line)
 			l.readChar()
 		} else {
 			// unknown \r token
-			return NewToken(ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
+			return token.NewToken(token.ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
 				Position: verror.Position{
 					Filename: l.filename,
 					Line:     l.line,
@@ -198,7 +201,7 @@ func (l *Lexer) GetToken() (Token, error) {
 			}
 		}
 	case '\n':
-		tok = NewToken(NEWLINE, l.ch, l.column, l.line)
+		tok = token.NewToken(token.NEWLINE, l.ch, l.column, l.line)
 		l.line += 1
 		l.column = 0
 	case '"':
@@ -210,28 +213,28 @@ func (l *Lexer) GetToken() (Token, error) {
 		tok.Value = l.input[pos:l.position]
 		tok.Column = l.column
 		tok.Line = l.line
-		tok.Type = STRING
+		tok.Type = token.STRING
 	default:
 		if utils.IsIdentifier(l.ch) {
 			tok.Value = l.readIdentifier()
 			switch tok.Value {
 			case "true":
-				tok.Type = TRUE
+				tok.Type = token.TRUE
 			case "false":
-				tok.Type = FALSE
+				tok.Type = token.FALSE
 			}
-			tok.Type = LookupIdent(tok.Value)
+			tok.Type = token.LookupIdent(tok.Value)
 			tok.Column = l.column
 			tok.Line = l.line
 			return tok, nil
 		} else if utils.IsDigit(l.ch) {
 			tok.Value = l.readNumber()
-			tok.Type = NUMBER
+			tok.Type = token.NUMBER
 			tok.Column = l.column
 			tok.Line = l.line
 			return tok, nil
 		}
-		return NewToken(ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
+		return token.NewToken(token.ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
 			Position: verror.Position{
 				Filename: l.filename,
 				Line:     l.line,
@@ -261,8 +264,8 @@ func (l *Lexer) Tokens() []Token {
 func (l *Lexer) TheEof() Token {
 	var lastTk = l.tokens[len(l.tokens)-1]
 	return Token{
-		Type:   EOF,
-		Value:  string(EOF),
+		Type:   token.EOF,
+		Value:  string(token.EOF),
 		Column: lastTk.Column,
 		Line:   lastTk.Line,
 	}
@@ -271,11 +274,11 @@ func (l *Lexer) TheEof() Token {
 func (l *Lexer) Print() {
 	for i := range l.tokens {
 		switch l.tokens[i].Type {
-		case ILLEGAL:
+		case token.ILLEGAL:
 			continue
-		case NEWLINE:
+		case token.NEWLINE:
 			fmt.Println()
-		case WHITESPACE:
+		case token.WHITESPACE:
 			fmt.Print(" ")
 		default:
 			fmt.Print(l.tokens[i].String())

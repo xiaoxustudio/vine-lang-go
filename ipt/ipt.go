@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"vine-lang/ast"
 	"vine-lang/env"
-	"vine-lang/lexer"
-	"vine-lang/libs/global"
 	"vine-lang/parser"
+	"vine-lang/token"
+	"vine-lang/utils"
 	"vine-lang/verror"
 )
 
@@ -32,6 +32,13 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 			lastResult = i.Eval(s, env)
 		}
 		return lastResult
+	case *ast.UseDecl:
+		source := i.Eval(n.Source, env)
+		env.ImportModule(source.(Token).Value)
+		for _, s := range n.Specifiers {
+			i.Eval(s, env)
+		}
+		return source
 	case *ast.ExpressionStmt:
 		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:
@@ -47,7 +54,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 		{
 			leftRaw := i.Eval(n.Left, env)
 			rightRaw := i.Eval(n.Right, env)
-			leftVal, isLeftInt, err := global.GetNumberAndType(leftRaw)
+			leftVal, isLeftInt, err := utils.GetNumberAndType(leftRaw)
 			if err != nil {
 				panic(verror.InterpreterVError{
 					Message: err.Error(),
@@ -59,7 +66,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 			}
 
 			/* 数字转换 */
-			rightVal, isRightInt, err := global.GetNumberAndType(rightRaw)
+			rightVal, isRightInt, err := utils.GetNumberAndType(rightRaw)
 			if err != nil {
 				panic(verror.InterpreterVError{
 					Position: verror.Position{
@@ -77,13 +84,13 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 				rInt := int64(rightVal)
 
 				switch n.Operator.Type {
-				case lexer.PLUS:
+				case token.PLUS:
 					result = lInt + rInt
-				case lexer.MINUS:
+				case token.MINUS:
 					result = lInt - rInt
-				case lexer.MUL:
+				case token.MUL:
 					result = lInt * rInt
-				case lexer.DIV:
+				case token.DIV:
 					if rInt == 0 {
 						panic(verror.InterpreterVError{
 							Position: verror.Position{
@@ -97,13 +104,13 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 				}
 			} else {
 				switch n.Operator.Type {
-				case lexer.PLUS:
+				case token.PLUS:
 					result = leftVal + rightVal
-				case lexer.MINUS:
+				case token.MINUS:
 					result = leftVal - rightVal
-				case lexer.MUL:
+				case token.MUL:
 					result = leftVal * rightVal
-				case lexer.DIV:
+				case token.DIV:
 					if rightVal == 0 {
 						panic(verror.InterpreterVError{
 							Position: verror.Position{
@@ -118,6 +125,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 			}
 
 			return result
+		}
+	case *ast.ArgsExpr:
+		return n
+	case *ast.CallExpr:
+		{
+			function := i.Eval(n.Callee, env)
+			args := make([]any, len(n.Args.Arguments))
+			for ind, arg := range n.Args.Arguments {
+				args[ind] = i.Eval(arg, env)
+			}
+			env.CallFunc(function.(Token), args)
+			return nil
 		}
 	case *ast.Literal:
 		return n.Value

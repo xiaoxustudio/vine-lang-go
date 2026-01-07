@@ -1,3 +1,7 @@
+use global
+
 let a =(2+2)/4
 a = -12 + 2
-测试 = 123
+let 测试 = 123
+
+print(测试)

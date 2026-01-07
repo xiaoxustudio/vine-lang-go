@@ -5,6 +5,7 @@ import (
 	"slices"
 	"vine-lang/ast"
 	"vine-lang/lexer"
+	"vine-lang/token"
 	"vine-lang/verror"
 )
 
@@ -16,22 +17,22 @@ type Parser struct {
 	position int
 	errors   []verror.ParseVError // 收集所有错误
 	ast      *ast.ProgramStmt
-	handlers map[lexer.TokenType][]func(p *Parser) any
+	handlers map[token.TokenType][]func(p *Parser) any
 }
 
 func New(lex *lexer.Lexer) *Parser {
-	p := &Parser{lexer: lex, tokens: []Token{}, position: 0, errors: []verror.ParseVError{}, handlers: make(map[lexer.TokenType][]func(p *Parser) any)}
+	p := &Parser{lexer: lex, tokens: []Token{}, position: 0, errors: []verror.ParseVError{}, handlers: make(map[token.TokenType][]func(p *Parser) any)}
 	// 移除不进行解析的token
-	for _, token := range lex.Tokens() {
-		if slices.Contains([]lexer.TokenType{lexer.WHITESPACE, lexer.NEWLINE}, token.Type) {
+	for _, tk := range lex.Tokens() {
+		if slices.Contains([]token.TokenType{token.WHITESPACE, token.NEWLINE}, tk.Type) {
 			continue
 		}
-		p.tokens = append(p.tokens, token)
+		p.tokens = append(p.tokens, tk)
 	}
 	return p
 }
 
-func (p *Parser) RegisterStmtHandler(kw lexer.TokenType, fn func(p *Parser) any) {
+func (p *Parser) RegisterStmtHandler(kw token.TokenType, fn func(p *Parser) any) {
 	if p.handlers[kw] == nil {
 		p.handlers[kw] = make([]func(p *Parser) any, 0)
 	}
@@ -88,7 +89,7 @@ func (p *Parser) errorf(token Token, format string, args ...any) {
 	panic(err)
 }
 
-func (p *Parser) expect(types ...lexer.TokenType) Token {
+func (p *Parser) expect(types ...token.TokenType) Token {
 	if len(types) == 0 {
 		current := p.peek()
 		p.errorf(current, "Internal error: expect() called with no arguments")
@@ -131,17 +132,18 @@ func (p *Parser) ParseProgram() *ast.ProgramStmt {
 
 func (p *Parser) parseStatement() ast.Stmt {
 	tk := p.peek()
-	for handlers, ok := p.handlers[tk.Type]; ok; {
+
+	if handlers, ok := p.handlers[tk.Type]; ok {
 		for _, handler := range handlers {
 			res := handler(p)
 			if stmt, ok := res.(ast.Stmt); ok {
 				return stmt
-			}
-			if _, ok := res.(error); ok {
-				continue
+			} else if _, ok := res.(error); ok {
+				break
 			}
 		}
 	}
+
 	return p.parseExpressionStatement()
 }
 
@@ -159,11 +161,24 @@ func (p *Parser) parseAssignmentExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	left := p.parseBinaryExpression()
-	if p.peek().Type == lexer.ASSIGN {
-		op := p.expect(lexer.ASSIGN)
+	left := p.parseLogicalExpression()
+	if p.peek().Type == token.ASSIGN {
+		op := p.expect(token.ASSIGN)
 		right := p.parseAssignmentExpression()
 		return &ast.AssignmentExpr{Left: left, Right: right, Operator: op}
+	}
+	return left
+}
+
+func (p *Parser) parseLogicalExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseBinaryExpression()
+	if p.peek().Type == token.OR || p.peek().Type == token.AND {
+		op := p.advance()
+		right := p.parseLogicalExpression()
+		return &ast.BinaryExpr{Left: left, Operator: op, Right: right}
 	}
 	return left
 }
@@ -172,8 +187,8 @@ func (p *Parser) parseBinaryExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	opMap := []lexer.TokenType{lexer.PLUS, lexer.MINUS, lexer.DIV, lexer.MUL}
-	left := p.parsePrimaryExpression()
+	opMap := []token.TokenType{token.PLUS, token.MINUS, token.DIV, token.MUL}
+	left := p.parseCallExpression()
 	if slices.Contains(opMap, p.peek().Type) {
 		op := p.advance()
 		right := p.parseBinaryExpression()
@@ -182,23 +197,52 @@ func (p *Parser) parseBinaryExpression() ast.Expr {
 	return left
 }
 
+func (p *Parser) parseArgs() *ast.ArgsExpr {
+	if p.isEof() {
+		return nil
+	}
+	var node = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+	for !p.isEof() && p.peek().Type != token.RPAREN {
+		expr := p.parseExpression()
+		if expr == nil {
+			break
+		}
+		node.Arguments = append(node.Arguments, expr)
+	}
+	return node
+}
+
+func (p *Parser) parseCallExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parsePrimaryExpression()
+	if p.peek().Type == token.LPAREN {
+		p.advance()
+		args := p.parseArgs()
+		p.expect(token.RPAREN)
+		return &ast.CallExpr{Callee: left.(*ast.Literal), Args: *args}
+	}
+	return left
+}
+
 func (p *Parser) parsePrimaryExpression() ast.Expr {
 	tk := p.peek()
 
 	switch tk.Type {
-	case lexer.IDENT, lexer.STRING, lexer.NUMBER:
+	case token.IDENT, token.STRING, token.NUMBER:
 		p.advance()
 		return p.createLiteral(tk)
-	case lexer.LPAREN:
+	case token.LPAREN:
 		p.advance()
 		expr := p.parseExpression()
-		p.expect(lexer.RPAREN)
+		p.expect(token.RPAREN)
 		return expr
-	case lexer.NEWLINE, lexer.WHITESPACE:
+	case token.NEWLINE, token.WHITESPACE:
 		p.advance()
 		return p.parsePrimaryExpression()
 	default:
-		p.errorf(tk, "unexpected token: %s", tk.Value)
+		p.errorf(tk, "unexpected token: %s", tk.String())
 		return nil
 	}
 }

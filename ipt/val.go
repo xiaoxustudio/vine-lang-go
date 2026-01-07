@@ -1,11 +1,12 @@
 package ipt
 
 import (
+	"go/ast"
 	"strconv"
-	"vine-lang/lexer"
+	"vine-lang/token"
 )
 
-type Token = lexer.Token
+type Token = token.Token
 
 // 定义值节点
 
@@ -19,18 +20,28 @@ type ValNode struct {
 
 func (v *ValNode) value() any {
 	switch v.Token.Type {
-	case lexer.NUMBER:
+	case token.NUMBER:
 		Val, _ := strconv.Atoi(v.Token.Value)
 		return Val
-	case lexer.STRING:
+	case token.STRING:
 		return v.Token.Value
-	case lexer.TRUE:
+	case token.TRUE:
 		return true
-	case lexer.FALSE:
+	case token.FALSE:
 		return false
-	case lexer.NULL:
+	case token.NULL:
 		return nil
 	default:
 		return v.Val
 	}
+}
+
+type FunctionLikeValNode struct {
+	Val
+	Token     *Token
+	Arguments []ast.Expr
+	Body      *ast.BlockStmt
+	isLamda   bool // 是否是匿名函数
+	isModule  bool // 是否是模块
+	isInside  bool // 是否是模块内部函数
 }

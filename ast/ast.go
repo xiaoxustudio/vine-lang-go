@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"strings"
 	"vine-lang/lexer"
 )
 
@@ -80,9 +81,12 @@ type BaseNode struct {
 	ID   *Token
 }
 
-// GetType 实现 Node 接口
 func (n *BaseNode) GetType() NodeType {
 	return n.Type
+}
+
+func (n *BaseNode) String() string {
+	return n.ID.Value
 }
 
 // ================================== Helper Interfaces for Unions ==================================
@@ -147,7 +151,7 @@ type UseDefaultSpecifier struct {
 type UseDecl struct {
 	BaseNode
 	Source     *Literal
-	Specifiers []Specifier // 接口切片，包含 UseSpecifier 或 UseDefaultSpecifier
+	Specifiers []Specifier
 }
 
 // FunctionDecl
@@ -210,11 +214,36 @@ type CompareExpr struct {
 	Operator Token
 }
 
+// ArgsExpr
+type ArgsExpr struct {
+	BaseNode
+	Arguments []Expr
+}
+
+func (a *ArgsExpr) GetType() NodeType {
+	return a.Type
+}
+
+func (a *ArgsExpr) String() string {
+	var args []string = make([]string, 0)
+	for i, arg := range a.Arguments {
+		args[i] = arg.String()
+	}
+	return fmt.Sprintf("ArgsExpr(%s)", strings.Join(args, ", "))
+}
+
 // CallExpr
 type CallExpr struct {
 	BaseNode
-	Callee    *Literal
-	Arguments []Expr
+	Callee *Literal
+	Args   ArgsExpr
+}
+
+func (c *CallExpr) GetType() NodeType {
+	return c.Type
+}
+func (c *CallExpr) String() string {
+	return fmt.Sprintf("CallExpr(%s, %s)", c.Callee.String(), c.Args.String())
 }
 
 type AssignmentExpr struct {
