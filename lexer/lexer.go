@@ -41,10 +41,7 @@ func (l *Lexer) readChar() {
 
 	l.ch, l.chWidth = utf8.DecodeRuneInString(l.input[l.position:])
 
-	if l.ch == '\n' {
-		l.line += 1
-		l.column = 0
-	} else {
+	if l.ch != '\n' {
 		l.column += 1
 	}
 }
