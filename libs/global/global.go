@@ -22,7 +22,7 @@ func NewModule() types.LibsModule {
 		rangeArgs := args[1]
 		for _, arg := range rangeArgs.([]any) {
 			val, _ := e.Get(arg.(token.Token))
-			fmt.Println(utils.TrasformPrintString(val))
+			fmt.Print(utils.TrasformPrintString(val), " ")
 		}
 	})
 	return g

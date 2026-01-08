@@ -207,6 +207,9 @@ func (p *Parser) parseArgs() *ast.ArgsExpr {
 		if expr == nil {
 			break
 		}
+		if p.peek().Type == token.COMMA {
+			p.advance()
+		}
 		node.Arguments = append(node.Arguments, expr)
 	}
 	return node
