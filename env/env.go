@@ -53,7 +53,7 @@ func (e *Environment) Set(name Token, val any) {
 	if !tk.IsEmpty() {
 		theEnv.store[tk] = val
 	} else {
-		panic(&verror.InterpreterVError{
+		panic(verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
 			Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
 		})
@@ -63,7 +63,7 @@ func (e *Environment) Set(name Token, val any) {
 func (e *Environment) Define(name Token, val any) {
 	_, tk := e.Lookup(name)
 	if !tk.IsEmpty() {
-		panic(&verror.InterpreterVError{
+		panic(verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
 			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
 		})
@@ -89,7 +89,7 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 		fnValue := reflect.ValueOf(funcVal)
 
 		if fnValue.Kind() != reflect.Func {
-			return nil, &verror.InterpreterVError{
+			return nil, verror.InterpreterVError{
 				Position: name.ToPosition(e.FileName),
 				Message:  fmt.Sprintf("variable %s is not a function", LibsUtils.TrasformPrintString(name.Value)),
 			}
@@ -104,7 +104,7 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 
 		return results, nil
 	} else {
-		return nil, &verror.InterpreterVError{
+		return nil, verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
 			Message:  fmt.Sprintf("function %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
 		}
@@ -117,7 +117,7 @@ func (e *Environment) ImportModule(name string) {
 			e.Define(Token{Type: token.IDENT, Value: k, Line: 0, Column: 0}, v)
 		}
 	} else {
-		panic(&verror.InterpreterVError{
+		panic(verror.InterpreterVError{
 			Position: Token{}.ToPosition(e.FileName),
 			Message:  fmt.Sprintf("module %s is not defined", LibsUtils.TrasformPrintString(name)),
 		})

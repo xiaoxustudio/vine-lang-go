@@ -129,18 +129,17 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		return n, nil
 	case *ast.CallExpr:
 		{
-			var err error
-			function, err := i.Eval(n.Callee, env)
+			function, _ := i.Eval(n.Callee, env)
 			args := make([]any, len(n.Args.Arguments))
 			for ind, arg := range n.Args.Arguments {
-				args[ind], err = i.Eval(arg, env)
+				args[ind], _ = i.Eval(arg, env)
 			}
 			if fn, ok := function.(token.Token); ok {
-				env.CallFunc(fn, args)
+				v, e := env.CallFunc(fn, args)
+				return v, e
 			} else {
 				return nil, i.Errorf(*n.ID, "Not a function")
 			}
-			return nil, err
 		}
 	case *ast.Literal:
 		if v, isGet := env.Get(n.Value); isGet {
@@ -161,12 +160,16 @@ func (i *Interpreter) EvalSafe() (any, error) {
 		if r := recover(); r != nil {
 			if parseErr, ok := r.(verror.InterpreterVError); ok {
 				i.errors = append(i.errors, parseErr)
-				fmt.Printf("Caught Error: %v\n", parseErr)
+				fmt.Printf("Runtime Error: %v\n", parseErr)
 			} else {
 				panic(r)
 			}
 		}
 	}()
 
-	return i.Eval(i.p.ParseProgram(), i.env)
+	v, e := i.Eval(i.p.ParseProgram(), i.env)
+	if e != nil {
+		panic(e)
+	}
+	return v, e
 }
