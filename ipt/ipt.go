@@ -7,6 +7,7 @@ import (
 	"vine-lang/env"
 	"vine-lang/parser"
 	"vine-lang/token"
+	"vine-lang/types"
 	"vine-lang/utils"
 	"vine-lang/verror"
 )
@@ -77,13 +78,15 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			var err error
 			leftRaw, err := i.Eval(n.Left, env)
 			rightRaw, err := i.Eval(n.Right, env)
-			leftVal, isLeftInt, err := utils.GetNumberAndType(leftRaw)
+			leftVal, leftEnum, err := utils.GetNumberAndType(leftRaw)
+			isLeftInt := leftEnum == types.GNT_INT
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
 			}
 
 			/* 数字转换 */
-			rightVal, isRightInt, err := utils.GetNumberAndType(rightRaw)
+			rightVal, rightEnum, err := utils.GetNumberAndType(rightRaw)
+			isRightInt := rightEnum == types.GNT_INT
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
 			}
@@ -91,8 +94,8 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			var result any
 
 			if isLeftInt && isRightInt {
-				lInt := int64(leftVal)
-				rInt := int64(rightVal)
+				lInt := leftVal.(int64)
+				rInt := rightVal.(int64)
 
 				switch n.Operator.Type {
 				case token.PLUS:
@@ -110,16 +113,48 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			} else {
 				switch n.Operator.Type {
 				case token.PLUS:
-					result = leftVal + rightVal
+					if isLeftInt {
+						if rightEnum == types.GNT_INT {
+							result = leftVal.(int64) + rightVal.(int64)
+						} else {
+							result = leftVal.(float64) + rightVal.(float64)
+						}
+					} else {
+						result = leftVal.(float64) + rightVal.(float64)
+					}
 				case token.MINUS:
-					result = leftVal - rightVal
+					if isLeftInt {
+						if rightEnum == types.GNT_INT {
+							result = leftVal.(int64) - rightVal.(int64)
+						} else {
+							result = leftVal.(float64) - rightVal.(float64)
+						}
+					} else {
+						result = leftVal.(float64) - rightVal.(float64)
+					}
 				case token.MUL:
-					result = leftVal * rightVal
+					if isLeftInt {
+						if rightEnum == types.GNT_INT {
+							result = leftVal.(int64) * rightVal.(int64)
+						} else {
+							result = leftVal.(float64) * rightVal.(float64)
+						}
+					} else {
+						result = leftVal.(float64) * rightVal.(float64)
+					}
 				case token.DIV:
 					if rightVal == 0 {
 						return nil, i.Errorf(n.Operator, "Divide by zero")
 					}
-					result = leftVal / rightVal
+					if isLeftInt {
+						if rightEnum == types.GNT_INT {
+							result = leftVal.(int64) / rightVal.(int64)
+						} else {
+							result = leftVal.(float64) / rightVal.(float64)
+						}
+					} else {
+						result = leftVal.(float64) / rightVal.(float64)
+					}
 				}
 			}
 

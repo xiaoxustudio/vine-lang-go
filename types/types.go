@@ -7,3 +7,11 @@ const (
 	Unknown LibsKeywords = "unknown"
 	Global  LibsKeywords = "global"
 )
+
+type GetNumberAndTypeENUM int
+
+const (
+	GNT_Unknown GetNumberAndTypeENUM = iota
+	GNT_INT
+	GNT_FLOAT
+)

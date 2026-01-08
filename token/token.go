@@ -77,7 +77,7 @@ const (
 	TYPEOF   TokenType = "TYPEOF"
 	TRUE     TokenType = "TRUE"
 	FALSE    TokenType = "FALSE"
-	NULL     TokenType = "NULL"
+	NIL      TokenType = "NIL"
 	PICK     TokenType = "PICK"
 
 	/* Inside Tag */
@@ -103,7 +103,7 @@ var Keywords = map[string]TokenType{
 	"typeof":   TYPEOF,
 	"true":     TRUE,
 	"false":    FALSE,
-	"null":     NULL,
+	"nil":      NIL,
 }
 
 type Token struct {

@@ -27,7 +27,7 @@ func (v *ValNode) value() any {
 		return true
 	case token.FALSE:
 		return false
-	case token.NULL:
+	case token.NIL:
 		return nil
 	default:
 		return v.Val

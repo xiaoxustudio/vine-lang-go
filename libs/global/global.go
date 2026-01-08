@@ -18,7 +18,7 @@ func NewModule() types.LibsModule {
 	}
 	g.LibsModuleInterface.Register("print", func(env any, rangeArgs []any) {
 		for _, arg := range rangeArgs {
-			fmt.Print(utils.TrasformPrintString(arg))
+			fmt.Print(utils.TrasformPrintStringWithColor(arg))
 		}
 		fmt.Println()
 	})
