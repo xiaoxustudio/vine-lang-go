@@ -1,12 +1,10 @@
 package ipt
 
 import (
-	"go/ast"
 	"strconv"
+	"vine-lang/ast"
 	"vine-lang/token"
 )
-
-type Token = token.Token
 
 // 定义值节点
 
@@ -15,7 +13,7 @@ type Val interface {
 }
 type ValNode struct {
 	Val
-	Token *Token
+	Token *token.Token
 }
 
 func (v *ValNode) value() any {
@@ -38,7 +36,7 @@ func (v *ValNode) value() any {
 
 type FunctionLikeValNode struct {
 	Val
-	Token     *Token
+	Token     *token.Token
 	Arguments []ast.Expr
 	Body      *ast.BlockStmt
 	isLamda   bool // 是否是匿名函数

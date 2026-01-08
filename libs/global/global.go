@@ -2,7 +2,6 @@ package global
 
 import (
 	"fmt"
-	"vine-lang/token"
 	"vine-lang/types"
 	"vine-lang/utils"
 )
@@ -17,13 +16,11 @@ func NewModule() types.LibsModule {
 			Store: make(types.LibsStoreMap),
 		},
 	}
-	g.LibsModuleInterface.Register("print", func(args ...any) {
-		e := args[0].(types.Scope)
-		rangeArgs := args[1]
-		for _, arg := range rangeArgs.([]any) {
-			val, _ := e.Get(arg.(token.Token))
-			fmt.Print(utils.TrasformPrintString(val), " ")
+	g.LibsModuleInterface.Register("print", func(env any, rangeArgs []any) {
+		for _, arg := range rangeArgs {
+			fmt.Print(utils.TrasformPrintString(arg))
 		}
+		fmt.Println()
 	})
 	return g
 }

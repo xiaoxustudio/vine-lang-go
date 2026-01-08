@@ -9,7 +9,7 @@ import (
 	"vine-lang/verror"
 )
 
-type Token = lexer.Token
+type Token = token.Token
 
 type Parser struct {
 	lexer    *lexer.Lexer
@@ -111,7 +111,7 @@ func (p *Parser) expect(types ...token.TokenType) Token {
 }
 
 /* Creaters  */
-func (p *Parser) createLiteral(val lexer.Token) *ast.Literal {
+func (p *Parser) createLiteral(val token.Token) *ast.Literal {
 	return &ast.Literal{Value: val}
 }
 

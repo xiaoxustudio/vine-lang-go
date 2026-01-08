@@ -3,7 +3,6 @@ package env
 import (
 	"fmt"
 	"reflect"
-	"vine-lang/lexer"
 	"vine-lang/libs"
 	"vine-lang/token"
 	"vine-lang/types"
@@ -11,7 +10,7 @@ import (
 	"vine-lang/verror"
 )
 
-type Token = lexer.Token
+type Token = token.Token
 
 type Environment struct {
 	parent   *Environment

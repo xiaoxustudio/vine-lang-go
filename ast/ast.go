@@ -3,10 +3,10 @@ package ast
 import (
 	"fmt"
 	"strings"
-	"vine-lang/lexer"
+	"vine-lang/token"
 )
 
-type Token = lexer.Token
+type Token = token.Token
 
 // ================================== Node Type Definitions ==================================
 

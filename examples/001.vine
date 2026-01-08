@@ -1,7 +1,5 @@
 use global
+let a = 2
 
-let a =(2+2)/4
-a = -12 + 2
-let 测试 = 123
-
-print(测试)
+print(a + 10)
+print("打印这个：",a + 10)

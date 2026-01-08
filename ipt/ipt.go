@@ -2,6 +2,7 @@ package ipt
 
 import (
 	"fmt"
+	"reflect"
 	"vine-lang/ast"
 	"vine-lang/env"
 	"vine-lang/parser"
@@ -24,57 +25,67 @@ func New(p *parser.Parser, env *env.Environment) *Interpreter {
 	}
 }
 
-func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
+func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVError {
+	return verror.InterpreterVError{
+		Message:  format,
+		Position: tk.ToPosition(i.env.FileName),
+	}
+}
+
+func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
+
 	switch n := node.(type) {
 	case *ast.ProgramStmt:
 		var lastResult any
+		var err error
 		for _, s := range n.Body {
-			lastResult = i.Eval(s, env)
+			lastResult, err = i.Eval(s, env)
 		}
-		return lastResult
+		return lastResult, err
 	case *ast.UseDecl:
-		source := i.Eval(n.Source, env)
-		env.ImportModule(source.(Token).Value)
+		source, err := i.Eval(n.Source, env)
+		if err != nil {
+			return nil, err
+		}
+		s, ok := source.(token.Token)
+		if !ok {
+			return nil, i.Errorf(token.Token{}, "Invalid module name")
+		}
+		env.ImportModule(s.Value)
 		for _, s := range n.Specifiers {
 			i.Eval(s, env)
 		}
-		return source
+		return source, err
 	case *ast.ExpressionStmt:
 		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:
-		val := i.Eval(n.Value, env)
+		val, err := i.Eval(n.Value, env)
 		env.Define(n.Name.Value, val)
-		return nil
+		return nil, err
 	case *ast.AssignmentExpr:
-		name := i.Eval(n.Left, env)
-		val := i.Eval(n.Right, env)
-		env.Set(name.(Token), val)
-		return nil
+		var err error
+		name, err := i.Eval(n.Left, env)
+		val, err := i.Eval(n.Right, env)
+		nameKey, ok := name.(token.Token)
+		if !ok {
+			return nil, i.Errorf(*n.ID, "Invalid assignment target")
+		}
+		env.Set(nameKey, val)
+		return nil, err
 	case *ast.BinaryExpr:
 		{
-			leftRaw := i.Eval(n.Left, env)
-			rightRaw := i.Eval(n.Right, env)
+			var err error
+			leftRaw, err := i.Eval(n.Left, env)
+			rightRaw, err := i.Eval(n.Right, env)
 			leftVal, isLeftInt, err := utils.GetNumberAndType(leftRaw)
 			if err != nil {
-				panic(verror.InterpreterVError{
-					Message: err.Error(),
-					Position: verror.Position{
-						Column: n.Operator.Column,
-						Line:   n.Operator.Line,
-					},
-				})
+				return nil, i.Errorf(n.Operator, err.Error())
 			}
 
 			/* 数字转换 */
 			rightVal, isRightInt, err := utils.GetNumberAndType(rightRaw)
 			if err != nil {
-				panic(verror.InterpreterVError{
-					Position: verror.Position{
-						Column: n.Operator.Column,
-						Line:   n.Operator.Line,
-					},
-					Message: err.Error(),
-				})
+				return nil, i.Errorf(n.Operator, err.Error())
 			}
 
 			var result any
@@ -92,13 +103,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 					result = lInt * rInt
 				case token.DIV:
 					if rInt == 0 {
-						panic(verror.InterpreterVError{
-							Position: verror.Position{
-								Column: n.Operator.Column,
-								Line:   n.Operator.Line,
-							},
-							Message: "Divide by zero",
-						})
+						return nil, i.Errorf(n.Operator, "Divide by zero")
 					}
 					result = lInt / rInt
 				}
@@ -112,39 +117,46 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) any {
 					result = leftVal * rightVal
 				case token.DIV:
 					if rightVal == 0 {
-						panic(verror.InterpreterVError{
-							Position: verror.Position{
-								Column: n.Operator.Column,
-								Line:   n.Operator.Line,
-							},
-							Message: "Divide by zero",
-						})
+						return nil, i.Errorf(n.Operator, "Divide by zero")
 					}
 					result = leftVal / rightVal
 				}
 			}
 
-			return result
+			return result, err
 		}
 	case *ast.ArgsExpr:
-		return n
+		return n, nil
 	case *ast.CallExpr:
 		{
-			function := i.Eval(n.Callee, env)
+			var err error
+			function, err := i.Eval(n.Callee, env)
 			args := make([]any, len(n.Args.Arguments))
 			for ind, arg := range n.Args.Arguments {
-				args[ind] = i.Eval(arg, env)
+				args[ind], err = i.Eval(arg, env)
 			}
-			env.CallFunc(function.(Token), args)
-			return nil
+			if fn, ok := function.(token.Token); ok {
+				env.CallFunc(fn, args)
+			} else {
+				return nil, i.Errorf(*n.ID, "Not a function")
+			}
+			return nil, err
 		}
 	case *ast.Literal:
-		return n.Value
+		if v, isGet := env.Get(n.Value); isGet {
+			if reflect.ValueOf(v).Kind() == reflect.Func {
+				// 内置函数
+				return n.Value, nil
+			}
+			return v, nil
+		} else {
+			return n.Value, nil
+		}
 	}
-	return nil
+	return nil, i.Errorf(token.Token{}, "Unknown node type")
 }
 
-func (i *Interpreter) EvalSafe() any {
+func (i *Interpreter) EvalSafe() (any, error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if parseErr, ok := r.(verror.InterpreterVError); ok {

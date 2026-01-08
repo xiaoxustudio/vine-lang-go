@@ -29,25 +29,23 @@ func TrasformPrintString(args ...any) string {
 	if len(args) == 0 {
 		return ""
 	}
-	switch args[0].(type) {
-	case string:
-		return args[0].(string)
-	case token.Token:
-		return args[0].(token.Token).Value
-	default:
-		return fmt.Sprint(args...)
+	var s string
+	for i := range args {
+		switch current := args[i].(type) {
+		case string:
+			return current
+		case token.Token:
+			return current.Value
+		default:
+			return fmt.Sprint(args...)
+		}
 	}
+	return s
 }
 
 /* 获取数字和类型 */
 func GetNumberAndType(v any) (float64, bool, error) {
 	switch val := v.(type) {
-	case int64:
-		return float64(val), true, nil
-	case float64:
-		return val, false, nil
-	case int:
-		return float64(val), true, nil
 	case token.Token:
 		f, err := strconv.ParseFloat(val.Value, 64)
 		if err != nil {
@@ -55,6 +53,12 @@ func GetNumberAndType(v any) (float64, bool, error) {
 		}
 		isInt := f == math.Trunc(f)
 		return f, isInt, nil
+	case int64:
+		return float64(val), true, nil
+	case float64:
+		return val, false, nil
+	case int:
+		return float64(val), true, nil
 	default:
 		return 0, false, fmt.Errorf("runtime error: unknown operand type %T", v)
 	}
