@@ -3,6 +3,7 @@ package ipt
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"vine-lang/ast"
 	"vine-lang/env"
 	"vine-lang/parser"
@@ -27,10 +28,10 @@ func New(p *parser.Parser, env *env.Environment) *Interpreter {
 }
 
 func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVError {
-	return verror.InterpreterVError{
+	panic(verror.InterpreterVError{
 		Message:  format,
 		Position: tk.ToPosition(i.env.FileName),
-	}
+	})
 }
 
 func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
@@ -177,15 +178,23 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			}
 		}
 	case *ast.Literal:
-		if v, isGet := env.Get(n.Value); isGet {
-			if reflect.ValueOf(v).Kind() == reflect.Func {
-				// 内置函数
+		if n.Value.Type == token.IDENT {
+			ok := types.LibsKeywords(n.Value.Value)
+			if ok.IsValidLibsKeyword() {
 				return n.Value, nil
 			}
-			return v, nil
-		} else {
+			if v, isGet := env.Get(n.Value); isGet {
+				if reflect.ValueOf(v).Kind() == reflect.Func {
+					// 内置函数
+					return n.Value, nil
+				}
+				return v, nil
+			}
+		} else if slices.Contains([]token.TokenType{token.STRING, token.NUMBER, token.STRING, token.TRUE, token.FALSE, token.NIL}, n.Value.Type) {
 			return n.Value, nil
 		}
+
+		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
 	}
 	return nil, i.Errorf(token.Token{}, "Unknown node type")
 }

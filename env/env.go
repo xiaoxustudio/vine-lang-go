@@ -113,9 +113,10 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 
 func (e *Environment) ImportModule(name string) {
 	if v, ok := libs.LibsMap[types.LibsKeywords(name)]; ok {
-		for k, v := range v.Return() {
-			e.Define(Token{Type: token.IDENT, Value: k, Line: 0, Column: 0}, v)
+		for fnName, fnValue := range v.Return() {
+			e.Define(Token{Type: token.IDENT, Value: fnName, Line: 0, Column: 0}, fnValue)
 		}
+		e.Define(Token{Type: token.IDENT, Value: name, Line: 0, Column: 0}, 0)
 	} else {
 		panic(verror.InterpreterVError{
 			Position: Token{}.ToPosition(e.FileName),
