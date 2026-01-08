@@ -8,16 +8,14 @@ import (
 	"vine-lang/verror"
 )
 
-type Token = token.Token
-
 type Lexer struct {
 	input    string
 	position int // current position in input (points to current char)
 	column   int // current column in input
 	line     int // current line in input
 	ch       rune
-	chWidth  int     // width of current rune in bytes
-	tokens   []Token // list of tokens
+	chWidth  int           // width of current rune in bytes
+	tokens   []token.Token // list of tokens
 	filename string
 }
 
@@ -76,8 +74,8 @@ func (l *Lexer) readNumber() string {
 	return l.input[position:l.position]
 }
 
-func (l *Lexer) GetToken() (Token, error) {
-	var tok Token
+func (l *Lexer) GetToken() (token.Token, error) {
+	var tok token.Token
 	switch l.ch {
 	case ',':
 		tok = token.NewToken(token.COMMA, l.ch, l.column, l.line)
@@ -205,8 +203,8 @@ func (l *Lexer) GetToken() (Token, error) {
 		l.line += 1
 		l.column = 0
 	case '"':
-		pos := l.position
 		l.readChar()
+		pos := l.position
 		for l.ch != '"' {
 			l.readChar()
 		}
@@ -257,13 +255,13 @@ func (l *Lexer) Parse() {
 	}
 }
 
-func (l *Lexer) Tokens() []Token {
+func (l *Lexer) Tokens() []token.Token {
 	return l.tokens
 }
 
-func (l *Lexer) TheEof() Token {
+func (l *Lexer) TheEof() token.Token {
 	var lastTk = l.tokens[len(l.tokens)-1]
-	return Token{
+	return token.Token{
 		Type:   token.EOF,
 		Value:  string(token.EOF),
 		Column: lastTk.Column,
