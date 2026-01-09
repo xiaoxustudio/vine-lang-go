@@ -14,7 +14,7 @@ func IsIdentifier(ch rune) bool {
 }
 
 func IsDigit(ch rune) bool {
-	return unicode.IsDigit(ch)
+	return unicode.IsDigit(ch) || ch == '.'
 }
 
 func Keys[M ~map[K]V, K comparable, V any](m M) []K {
@@ -72,7 +72,7 @@ func TrasformPrintStringWithColor(args ...any) string {
 		case int, int64:
 			return fmt.Sprintf("%s%d%s", Color.Blue, current, "\033[0m")
 		case float32, float64:
-			return fmt.Sprintf("%s%d%s", Color.Green, current, "\033[0m")
+			return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
 		case token.Token:
 			switch current.Type {
 			case token.NUMBER:

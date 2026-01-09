@@ -118,8 +118,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 						if rightEnum == types.GNT_INT {
 							result = leftVal.(int64) + rightVal.(int64)
 						} else {
-							result = leftVal.(float64) + rightVal.(float64)
+							intVal, ok := leftVal.(int64)
+							if !ok {
+								return nil, i.Errorf(n.Operator, "Invalid operand type")
+							}
+							result = float64(intVal) + rightVal.(float64)
 						}
+					} else if isRightInt {
+						intVal, ok := rightVal.(int64)
+						if !ok {
+							return nil, i.Errorf(n.Operator, "Invalid operand type")
+						}
+						result = leftVal.(float64) + float64(intVal)
 					} else {
 						result = leftVal.(float64) + rightVal.(float64)
 					}
@@ -128,8 +138,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 						if rightEnum == types.GNT_INT {
 							result = leftVal.(int64) - rightVal.(int64)
 						} else {
-							result = leftVal.(float64) - rightVal.(float64)
+							intVal, ok := leftVal.(int64)
+							if !ok {
+								return nil, i.Errorf(n.Operator, "Invalid operand type")
+							}
+							result = float64(intVal) - rightVal.(float64)
 						}
+					} else if isRightInt {
+						intVal, ok := rightVal.(int64)
+						if !ok {
+							return nil, i.Errorf(n.Operator, "Invalid operand type")
+						}
+						result = leftVal.(float64) - float64(intVal)
 					} else {
 						result = leftVal.(float64) - rightVal.(float64)
 					}
@@ -138,8 +158,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 						if rightEnum == types.GNT_INT {
 							result = leftVal.(int64) * rightVal.(int64)
 						} else {
-							result = leftVal.(float64) * rightVal.(float64)
+							intVal, ok := leftVal.(int64)
+							if !ok {
+								return nil, i.Errorf(n.Operator, "Invalid operand type")
+							}
+							result = float64(intVal) * rightVal.(float64)
 						}
+					} else if isRightInt {
+						intVal, ok := rightVal.(int64)
+						if !ok {
+							return nil, i.Errorf(n.Operator, "Invalid operand type")
+						}
+						result = leftVal.(float64) * float64(intVal)
 					} else {
 						result = leftVal.(float64) * rightVal.(float64)
 					}
@@ -151,8 +181,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 						if rightEnum == types.GNT_INT {
 							result = leftVal.(int64) / rightVal.(int64)
 						} else {
-							result = leftVal.(float64) / rightVal.(float64)
+							intVal, ok := leftVal.(int64)
+							if !ok {
+								return nil, i.Errorf(n.Operator, "Invalid operand type")
+							}
+							result = float64(intVal) / rightVal.(float64)
 						}
+					} else if isRightInt {
+						intVal, ok := rightVal.(int64)
+						if !ok {
+							return nil, i.Errorf(n.Operator, "Invalid operand type")
+						}
+						result = leftVal.(float64) / float64(intVal)
 					} else {
 						result = leftVal.(float64) / rightVal.(float64)
 					}
