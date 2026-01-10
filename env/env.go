@@ -23,6 +23,10 @@ func New(fileName string) *Environment {
 	return e
 }
 
+func (e *Environment) Link(parent *Environment) {
+	e.parent = parent
+}
+
 func (e *Environment) Get(name Token) (any, bool) {
 	for k := range e.store {
 		if k.Value == name.Value {

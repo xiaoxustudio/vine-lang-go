@@ -92,6 +92,7 @@ func (p *Parser) errorf(token Token, format string, args ...any) {
 			Column: token.Column},
 		Message: msg,
 	}
+
 	panic(err)
 }
 
@@ -153,6 +154,19 @@ func (p *Parser) parseStatement() ast.Stmt {
 	return p.parseExpressionStatement()
 }
 
+func (p *Parser) parseBlockStatement() *ast.BlockStmt {
+	p.expect(token.COLON)
+	var body []ast.Stmt
+	for !p.isEof() && p.peek().Type != token.END {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			body = append(body, stmt)
+		}
+	}
+	p.expect(token.END)
+	return &ast.BlockStmt{Body: body}
+}
+
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStmt {
 	expr := p.parseExpression()
 	return &ast.ExpressionStmt{Expression: expr}
@@ -180,11 +194,24 @@ func (p *Parser) parseLogicalExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	left := p.parseBinaryExpression()
+	left := p.parseCompareExpression()
 	if p.peek().Type == token.OR || p.peek().Type == token.AND {
 		op := p.advance()
 		right := p.parseLogicalExpression()
 		return &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+	}
+	return left
+}
+
+func (p *Parser) parseCompareExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseBinaryExpression()
+	if p.peek().Type == token.EQ || p.peek().Type == token.NOT_EQ || p.peek().Type == token.LESS_EQ || p.peek().Type == token.GREATER_EQ || p.peek().Type == token.LESS || p.peek().Type == token.GREATER {
+		op := p.advance()
+		right := p.parseCompareExpression()
+		return &ast.CompareExpr{Left: left, Operator: op, Right: right}
 	}
 	return left
 }
@@ -225,12 +252,24 @@ func (p *Parser) parseCallExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	left := p.parsePrimaryExpression()
+	left := p.parseSuffixExpression()
 	if p.peek().Type == token.LPAREN {
 		p.advance()
 		args := p.parseArgs()
 		p.expect(token.RPAREN)
 		return &ast.CallExpr{Callee: left.(*ast.Literal), Args: *args}
+	}
+	return left
+}
+
+func (p *Parser) parseSuffixExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parsePrimaryExpression()
+	if p.peek().Type == token.INC || p.peek().Type == token.DEC {
+		op := p.advance()
+		return &ast.UnaryExpr{Operator: op, Value: left, IsSuffix: true}
 	}
 	return left
 }
@@ -250,6 +289,10 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 	case token.NEWLINE, token.WHITESPACE, token.COMMENT:
 		p.advance()
 		return p.parsePrimaryExpression()
+	case token.NOT, token.DEC, token.INC:
+		op := p.advance()
+		right := p.parseExpression()
+		return &ast.UnaryExpr{Operator: op, Value: right, IsSuffix: false}
 	default:
 		p.errorf(tk, "unexpected token: %s", tk.String())
 		return nil

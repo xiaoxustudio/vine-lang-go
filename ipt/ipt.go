@@ -3,9 +3,9 @@ package ipt
 import (
 	"fmt"
 	"reflect"
-	"slices"
 	"vine-lang/ast"
 	"vine-lang/env"
+	environment "vine-lang/env"
 	"vine-lang/parser"
 	"vine-lang/token"
 	"vine-lang/types"
@@ -47,6 +47,13 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			lastResult, err = i.Eval(s, env)
 		}
 		return lastResult, err
+	case *ast.BlockStmt:
+		var lastResult any
+		var err error
+		for _, s := range n.Body {
+			lastResult, err = i.Eval(s, env)
+		}
+		return lastResult, err
 	case *ast.UseDecl:
 		source, err := i.Eval(n.Source, env)
 		if err != nil {
@@ -66,7 +73,28 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 	case *ast.VariableDecl:
 		val, err := i.Eval(n.Value, env)
 		env.Define(n.Name.Value, val)
-		return nil, err
+		return val, err
+	case *ast.ForStmt:
+		var newEnv = environment.New(env.FileName)
+		newEnv.Link(env)
+		if n.Range != nil {
+			return nil, nil
+		} else {
+			i.Eval(n.Init, newEnv)
+			for {
+				if res, err := i.Eval(n.Value, newEnv); err == nil {
+					if val, ok := res.(bool); ok && val {
+						i.Eval(n.Body, newEnv)
+						i.Eval(n.Update, newEnv)
+					} else {
+						break
+					}
+				} else {
+					break
+				}
+			}
+			return nil, nil
+		}
 	case *ast.AssignmentExpr:
 		var err error
 		name, err := i.Eval(n.Left, env)
@@ -77,6 +105,15 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		}
 		env.Set(nameKey, val)
 		return nil, err
+	case *ast.CompareExpr:
+		{
+			leftRaw, err := i.Eval(n.Left, env)
+			rightRaw, err := i.Eval(n.Right, env)
+			if err != nil {
+				return nil, i.Errorf(n.Operator, err.Error())
+			}
+			return utils.CompareVal(leftRaw, n.Operator.Type, rightRaw)
+		}
 	case *ast.BinaryExpr:
 		{
 			var err error
@@ -220,6 +257,42 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 				return nil, i.Errorf(*n.ID, "Not a function")
 			}
 		}
+	case *ast.UnaryExpr:
+		operand, ok := n.Value.(*ast.Literal)
+		if !ok {
+			return nil, i.Errorf(n.Operator, "operand of increment/decrement must be a variable")
+		}
+
+		if operand.Value.Type != token.IDENT {
+			return nil, i.Errorf(operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
+		}
+
+		oldVal, exists := env.Get(operand.Value)
+		if !exists {
+			return nil, i.Errorf(operand.Value, fmt.Sprintf("undefined variable: %s", operand.Value.Value))
+		}
+
+		var newVal interface{}
+
+		switch v := oldVal.(type) {
+		case int:
+			newVal = v + 1
+		case int64:
+			newVal = v + 1
+		case float64:
+			newVal = v + 1
+		default:
+			return nil, i.Errorf(operand.Value, fmt.Sprintf("invalid operation: ++ (non-numeric type %T)", v))
+		}
+
+		env.Set(operand.Value, newVal)
+
+		if n.IsSuffix {
+			return oldVal, nil
+		} else {
+			return newVal, nil
+		}
+
 	case *ast.Literal:
 		if n.Value.Type == token.IDENT {
 			ok := types.LibsKeywords(n.Value.Value)
@@ -233,15 +306,26 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 				}
 				return v, nil
 			}
-		} else if slices.Contains([]token.TokenType{token.STRING, token.NUMBER, token.STRING, token.TRUE, token.FALSE, token.NIL}, n.Value.Type) {
-			return n.Value, nil
+		}
+		switch n.Value.Type {
+		case token.NUMBER:
+			v, _, err := utils.GetNumberAndType(n.Value)
+			return v, err
+		case token.STRING:
+			return n.Value.Value, nil
+		case token.TRUE:
+			return true, nil
+		case token.FALSE:
+			return false, nil
+		case token.NIL:
+			return nil, nil
 		}
 
 		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value))
 	case *ast.CommentStmt:
 		return nil, nil
 	}
-	return nil, i.Errorf(token.Token{}, "Unknown node type")
+	return nil, i.Errorf(token.Token{}, fmt.Sprintf("Unknown AST node type: %T", node))
 }
 
 func (i *Interpreter) EvalSafe() (any, error) {

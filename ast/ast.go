@@ -206,12 +206,19 @@ type RangeExpr struct {
 	Step  Token
 }
 
-// EqualExpr
-type EqualExpr struct {
+// UnaryExpr
+type UnaryExpr struct {
 	BaseNode
-	Left     Expr
-	Right    Expr
+	Value    Expr
 	Operator Token
+	IsSuffix bool // 后缀运算符
+}
+
+func (u *UnaryExpr) String() string {
+	if u.IsSuffix {
+		return fmt.Sprintf("UnaryExpr(%s %s)", u.Value.String(), u.Operator.String())
+	}
+	return fmt.Sprintf("UnaryExpr(%s %s)", u.Operator.String(), u.Value.String())
 }
 
 // CompareExpr
@@ -220,6 +227,10 @@ type CompareExpr struct {
 	Left     Expr
 	Right    Expr
 	Operator Token
+}
+
+func (ce *CompareExpr) String() string {
+	return fmt.Sprintf("CompareExpr(%s %s %s)", ce.Left.String(), ce.Operator.String(), ce.Right.String())
 }
 
 // ArgsExpr
@@ -344,7 +355,7 @@ type ExposeStmt struct {
 // BlockStmt
 type BlockStmt struct {
 	BaseNode
-	Body []Expr
+	Body []Stmt
 }
 
 // CaseBlockStmt
@@ -394,9 +405,9 @@ type IfStmt struct {
 type ForStmt struct {
 	BaseNode
 	Init   Expr
-	Value  Expr // 可选
-	Range  *RangeExpr
+	Value  Expr
 	Update Expr
+	Range  any // 可选
 	Body   *BlockStmt
 }
 

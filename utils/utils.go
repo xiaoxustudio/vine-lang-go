@@ -118,3 +118,162 @@ func GetNumberAndType(v any) (any, types.GetNumberAndTypeENUM, error) {
 		return -1, types.GNT_Unknown, fmt.Errorf("runtime error: unknown operand type %T", v)
 	}
 }
+
+type ComparableType int
+
+const (
+	TypeFloat64 ComparableType = iota
+	TypeString
+	TypeBool
+	TypeInvalid
+)
+
+type InternalValue struct {
+	Kind  ComparableType
+	Value any // 实际存储 float64, string 或 bool
+}
+
+func CompareVal(leftVal any, op token.TokenType, rightVal any) (bool, error) {
+	// 第一步：解析左侧值
+	left, err := ResolveValue(leftVal)
+	if err != nil {
+		return false, fmt.Errorf("left param error: %v", err)
+	}
+
+	// 第二步：解析右侧值
+	right, err := ResolveValue(rightVal)
+	if err != nil {
+		return false, fmt.Errorf("right param error: %v", err)
+	}
+
+	// 第三步：检查类型是否兼容
+	// 只有相同类型才能比较 (例如数字不能和字符串比较)
+	if left.Kind != right.Kind {
+		return false, fmt.Errorf("type mismatch: cannot compare %v with %v", left.Kind, right.Kind)
+	}
+
+	// 第四步：根据类型分发比较逻辑
+	switch left.Kind {
+	case TypeFloat64:
+		return compareNumbers(left.Value.(float64), op, right.Value.(float64))
+	case TypeString:
+		return compareStrings(left.Value.(string), op, right.Value.(string))
+	case TypeBool:
+		// 布尔值通常只支持相等性判断 (==, !=)
+		// 如果你需要 true > false 这样的逻辑，可以在这里扩展
+		return compareBools(left.Value.(bool), op, right.Value.(bool))
+	default:
+		return false, fmt.Errorf("unsupported type for comparison")
+	}
+}
+
+func ResolveValue(val any) (InternalValue, error) {
+	switch v := val.(type) {
+	case *token.Token:
+		return ParseTokenToValue(v)
+	case token.Token:
+		return ParseTokenToValue(&v)
+	case int, int64, int32:
+		return InternalValue{Kind: TypeFloat64, Value: toFloat64(v)}, nil
+	case float64, float32:
+		return InternalValue{Kind: TypeFloat64, Value: toFloat64(v)}, nil
+	case string:
+		return InternalValue{Kind: TypeString, Value: v}, nil
+	case bool:
+		return InternalValue{Kind: TypeBool, Value: v}, nil
+	default:
+		return InternalValue{}, fmt.Errorf("unsupported input type: %T", val)
+	}
+}
+
+func ParseTokenToValue(t *token.Token) (InternalValue, error) {
+	switch t.Type {
+	case token.NUMBER:
+		// 尝试将字符串值转为 float64
+		f, err := strconv.ParseFloat(t.Value, 64)
+		if err != nil {
+			return InternalValue{}, fmt.Errorf("invalid number token '%s'", t.Value)
+		}
+		return InternalValue{Kind: TypeFloat64, Value: f}, nil
+
+	case token.STRING:
+		return InternalValue{Kind: TypeString, Value: t.Value}, nil
+
+	case token.TRUE, token.FALSE:
+		// 尝试解析布尔字符串 "true" 或 "false"
+		b, err := strconv.ParseBool(t.Value)
+		if err != nil {
+			return InternalValue{}, fmt.Errorf("invalid bool token '%s'", t.Value)
+		}
+		return InternalValue{Kind: TypeBool, Value: b}, nil
+
+	default:
+		return InternalValue{}, fmt.Errorf("unknown token type: %v", t.Type)
+	}
+}
+
+func compareNumbers(left float64, op token.TokenType, right float64) (bool, error) {
+	switch op {
+	case token.EQ:
+		return left == right, nil
+	case token.NOT_EQ:
+		return left != right, nil
+	case token.LESS:
+		return left < right, nil
+	case token.LESS_EQ:
+		return left <= right, nil
+	case token.GREATER:
+		return left > right, nil
+	case token.GREATER_EQ:
+		return left >= right, nil
+	default:
+		return false, fmt.Errorf("invalid operator '%v' for numbers", op)
+	}
+}
+
+func compareStrings(left string, op token.TokenType, right string) (bool, error) {
+	switch op {
+	case token.EQ:
+		return left == right, nil
+	case token.NOT_EQ:
+		return left != right, nil
+	case token.LESS:
+		return left < right, nil
+	case token.LESS_EQ:
+		return left <= right, nil
+	case token.GREATER:
+		return left > right, nil
+	case token.GREATER_EQ:
+		return left >= right, nil
+	default:
+		return false, fmt.Errorf("invalid operator '%v' for strings", op)
+	}
+}
+
+func compareBools(left bool, op token.TokenType, right bool) (bool, error) {
+	switch op {
+	case token.EQ:
+		return left == right, nil
+	case token.NOT_EQ:
+		return left != right, nil
+	default:
+		return false, fmt.Errorf("invalid operator '%v' for booleans", op)
+	}
+}
+
+func toFloat64(val interface{}) float64 {
+	switch v := val.(type) {
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	default:
+		return 0
+	}
+}

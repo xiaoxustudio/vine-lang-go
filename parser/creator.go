@@ -83,5 +83,31 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		}
 	})
 
+	c.RegisterStmtHandler(token.FOR, func(p *Parser) any {
+		p.advance() // skip 'for'
+		firstExpr := p.parseStatement()
+		var body *ast.BlockStmt
+		// for i := range xxx
+		if p.peek().Type == token.COLON {
+			body = p.parseBlockStatement()
+			return &ast.ForStmt{
+				Body:  body,
+				Range: firstExpr,
+			}
+		}
+		// for i := 0; i < 10; i++ :
+		p.expect(token.SEMICOLON)
+		secondExpr := p.parseCompareExpression()
+		p.expect(token.SEMICOLON)
+		thirdExpr := p.parseExpression()
+		body = p.parseBlockStatement()
+		return &ast.ForStmt{
+			Body:   body,
+			Init:   firstExpr,
+			Value:  secondExpr,
+			Update: thirdExpr,
+		}
+	})
+
 	return c
 }
