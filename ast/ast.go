@@ -132,6 +132,10 @@ type CommentStmt struct {
 	Value Token
 }
 
+func (l *CommentStmt) String() string {
+	return fmt.Sprintf("#CommentStmt(%s)", l.Value.String())
+}
+
 // ================================== Declarations ==================================
 
 // UseSpecifier
@@ -152,6 +156,10 @@ type UseDecl struct {
 	BaseNode
 	Source     *Literal
 	Specifiers []Specifier
+}
+
+func (u *UseDecl) String() string {
+	return fmt.Sprintf("UseDecl(%s, %s)", u.Source.String(), u.Specifiers)
 }
 
 // FunctionDecl
@@ -225,7 +233,7 @@ func (a *ArgsExpr) GetType() NodeType {
 }
 
 func (a *ArgsExpr) String() string {
-	var args []string = make([]string, 0)
+	var args = make([]string, len(a.Arguments))
 	for i, arg := range a.Arguments {
 		args[i] = arg.String()
 	}
@@ -294,7 +302,7 @@ type BinaryExpr struct {
 }
 
 func (b *BinaryExpr) String() string {
-	return fmt.Sprintf("BinaryExpr(%s %s %s)", b.Left, b.Operator.String(), b.Right)
+	return fmt.Sprintf("BinaryExpr(%s %s %s)", b.Left.String(), b.Operator.String(), b.Right.String())
 }
 
 // ToExpr
@@ -367,6 +375,9 @@ type ProgramStmt struct {
 
 func (p *ProgramStmt) Print() {
 	for _, stmt := range p.Body {
+		if stmt == nil {
+			continue
+		}
 		fmt.Println(stmt.String())
 	}
 }

@@ -32,6 +32,12 @@ func New(lex *lexer.Lexer) *Parser {
 	return p
 }
 
+func (p *Parser) Print() {
+	for _, v := range p.ast.Body {
+		fmt.Println(v.String())
+	}
+}
+
 func (p *Parser) RegisterStmtHandler(kw token.TokenType, fn func(p *Parser) any) {
 	if p.handlers[kw] == nil {
 		p.handlers[kw] = make([]func(p *Parser) any, 0)
@@ -117,17 +123,17 @@ func (p *Parser) createLiteral(val token.Token) *ast.Literal {
 
 /* Parsers */
 func (p *Parser) ParseProgram() *ast.ProgramStmt {
-	program := &ast.ProgramStmt{}
-	program.Body = []ast.Stmt{}
+	p.ast = &ast.ProgramStmt{}
+	p.ast.Body = []ast.Stmt{}
 
 	for !p.isEof() {
 		stmt := p.parseStatement()
 		if stmt != nil {
-			program.Body = append(program.Body, stmt)
+			p.ast.Body = append(p.ast.Body, stmt)
 		}
 	}
-	p.ast = program
-	return program
+
+	return p.ast
 }
 
 func (p *Parser) parseStatement() ast.Stmt {
@@ -241,7 +247,7 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 		expr := p.parseExpression()
 		p.expect(token.RPAREN)
 		return expr
-	case token.NEWLINE, token.WHITESPACE:
+	case token.NEWLINE, token.WHITESPACE, token.COMMENT:
 		p.advance()
 		return p.parsePrimaryExpression()
 	default:

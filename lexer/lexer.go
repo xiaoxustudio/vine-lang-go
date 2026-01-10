@@ -77,6 +77,17 @@ func (l *Lexer) readNumber() string {
 func (l *Lexer) GetToken() (token.Token, error) {
 	var tok token.Token
 	switch l.ch {
+	case '#':
+		l.readChar()
+		pos := l.position
+		for l.ch != '\n' && !l.isEof() {
+			l.readChar()
+		}
+		tok.Value = l.input[pos:l.position]
+		tok.Column = l.column
+		tok.Line = l.line
+		tok.Type = token.COMMENT
+		return tok, nil
 	case ',':
 		tok = token.NewToken(token.COMMA, l.ch, l.column, l.line)
 	case ':':

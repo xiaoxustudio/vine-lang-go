@@ -1,5 +1,5 @@
 use global
-
+# 这是一段代码
 let a = 2
 
 let xuran = "错误"

@@ -35,6 +35,9 @@ func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVE
 }
 
 func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
+	if node == nil || env == nil {
+		return nil, nil
+	}
 
 	switch n := node.(type) {
 	case *ast.ProgramStmt:
@@ -234,7 +237,9 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return n.Value, nil
 		}
 
-		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
+		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value))
+	case *ast.CommentStmt:
+		return nil, nil
 	}
 	return nil, i.Errorf(token.Token{}, "Unknown node type")
 }
@@ -250,8 +255,8 @@ func (i *Interpreter) EvalSafe() (any, error) {
 			}
 		}
 	}()
-
-	v, e := i.Eval(i.p.ParseProgram(), i.env)
+	ast := i.p.ParseProgram()
+	v, e := i.Eval(ast, i.env)
 	if e != nil {
 		panic(e)
 	}

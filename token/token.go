@@ -14,6 +14,7 @@ const (
 	NEWLINE    TokenType = "\n"
 	WHITESPACE TokenType = "WHITESPACE"
 	ILLEGAL    TokenType = "ILLEGAL"
+	COMMENT    TokenType = "COMMENT"
 
 	// Identifiers and literals
 	IDENT  TokenType = "IDENT"

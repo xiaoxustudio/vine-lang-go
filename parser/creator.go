@@ -10,6 +10,12 @@ import (
 func CreateParser(lex *lexer.Lexer) *Parser {
 	c := New(lex)
 
+	c.RegisterStmtHandler(token.COMMENT, func(p *Parser) any {
+		return &ast.CommentStmt{
+			Value: p.advance(),
+		}
+	})
+
 	c.RegisterStmtHandler(token.LET, func(p *Parser) any {
 		startToken := p.advance()
 		isConst := startToken.Type == token.CST
