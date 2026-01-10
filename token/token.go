@@ -61,6 +61,7 @@ const (
 
 	// Keywords
 	FUNCTION TokenType = "FUNCTION"
+	END      TokenType = "END"
 	LET      TokenType = "LET"
 	CST      TokenType = "CST" // const keywords
 	IF       TokenType = "IF"
@@ -105,6 +106,7 @@ var Keywords = map[string]TokenType{
 	"true":     TRUE,
 	"false":    FALSE,
 	"nil":      NIL,
+	"end":      END,
 }
 
 type Token struct {
@@ -118,6 +120,15 @@ func NewToken(t TokenType, v rune, col, line int) Token {
 	return Token{
 		Type:   t,
 		Value:  string(v),
+		Column: col,
+		Line:   line,
+	}
+}
+
+func NewTokenDuplicated(t TokenType, v rune, col, line int, vv rune) Token {
+	return Token{
+		Type:   t,
+		Value:  string(v) + string(vv),
 		Column: col,
 		Line:   line,
 	}

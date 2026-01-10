@@ -100,10 +100,10 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		peek := l.peekRune()
 		switch peek {
 		case '+':
-			tok = token.NewToken(token.INC, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.INC, l.ch, l.column, l.line, peek)
 			l.readChar()
 		case '=':
-			tok = token.NewToken(token.INC_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.INC_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		default:
 			tok = token.NewToken(token.PLUS, l.ch, l.column, l.line)
@@ -112,10 +112,10 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		peek := l.peekRune()
 		switch peek {
 		case '-':
-			tok = token.NewToken(token.DEC, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.DEC, l.ch, l.column, l.line, peek)
 			l.readChar()
 		case '=':
-			tok = token.NewToken(token.DEC_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.DEC_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		default:
 			if utils.IsDigit(peek) {
@@ -133,7 +133,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		peek := l.peekRune()
 		switch peek {
 		case '=':
-			tok = token.NewToken(token.MUL_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.MUL_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		default:
 			tok = token.NewToken(token.MUL, l.ch, l.column, l.line)
@@ -142,7 +142,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		peek := l.peekRune()
 		switch peek {
 		case '=':
-			tok = token.NewToken(token.DIV_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.DIV_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		default:
 			tok = token.NewToken(token.DIV, l.ch, l.column, l.line)
@@ -150,7 +150,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 	case '=':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = token.NewToken(token.EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		} else {
 			tok = token.NewToken(token.ASSIGN, l.ch, l.column, l.line)
@@ -158,7 +158,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 	case '!':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = token.NewToken(token.NOT_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.NOT_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		} else {
 			tok = token.NewToken(token.BANG, l.ch, l.column, l.line)
@@ -166,7 +166,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 	case '<':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = token.NewToken(token.LESS_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.LESS_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		} else {
 			tok = token.NewToken(token.LESS, l.ch, l.column, l.line)
@@ -174,7 +174,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 	case '>':
 		peek := l.peekRune()
 		if peek == '=' {
-			tok = token.NewToken(token.GREATER_EQ, l.ch+peek, l.column, l.line)
+			tok = token.NewTokenDuplicated(token.GREATER_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		} else {
 			tok = token.NewToken(token.GREATER, l.ch, l.column, l.line)
