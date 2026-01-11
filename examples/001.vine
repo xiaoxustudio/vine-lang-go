@@ -1,11 +1,9 @@
 use global
 # 这是一段代码
 let a = 2
+a = 2 + a
+print(a)
 
-let xuran = "错误"
-
-print(a++)
-print(++a)
 # for let i = 0; i < 10; i++ :
 #     print(i)
 # end

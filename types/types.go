@@ -27,4 +27,5 @@ const (
 	GNT_Unknown GetNumberAndTypeENUM = iota
 	GNT_INT
 	GNT_FLOAT
+	GNT_STRING
 )

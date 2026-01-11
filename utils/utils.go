@@ -95,18 +95,25 @@ func TrasformPrintStringWithColor(args ...any) string {
 func GetNumberAndType(v any) (any, types.GetNumberAndTypeENUM, error) {
 	switch val := v.(type) {
 	case token.Token:
-		if strings.Contains(val.Value, ".") {
-			f, err := strconv.ParseFloat(val.Value, 64)
-			if err != nil {
-				return 0, types.GNT_FLOAT, err
+		switch val.Type {
+		case token.NUMBER:
+			if strings.Contains(val.Value, ".") {
+				f, err := strconv.ParseFloat(val.Value, 64)
+				if err != nil {
+					return 0, types.GNT_FLOAT, err
+				}
+				return f, types.GNT_FLOAT, nil
+			} else {
+				i, err := strconv.Atoi(val.Value)
+				if err != nil {
+					return 0, types.GNT_INT, err
+				}
+				return int64(i), types.GNT_INT, nil
 			}
-			return f, types.GNT_FLOAT, nil
-		} else {
-			i, err := strconv.Atoi(val.Value)
-			if err != nil {
-				return 0, types.GNT_INT, err
-			}
-			return int64(i), types.GNT_INT, nil
+		case token.STRING:
+			return val.Value, types.GNT_STRING, nil
+		default:
+			return val.Value, types.GNT_Unknown, fmt.Errorf("runtime error: unknown operand type %T", v)
 		}
 	case int64:
 		return val, types.GNT_INT, nil
@@ -117,6 +124,63 @@ func GetNumberAndType(v any) (any, types.GetNumberAndTypeENUM, error) {
 	default:
 		return -1, types.GNT_Unknown, fmt.Errorf("runtime error: unknown operand type %T", v)
 	}
+}
+
+func BinaryVal(leftVal any, op token.TokenType, rightVal any) (any, error) {
+	left, err := ResolveValue(leftVal)
+	if err != nil {
+		return false, fmt.Errorf("left param error: %v", err)
+	}
+
+	right, err := ResolveValue(rightVal)
+	if err != nil {
+		return false, fmt.Errorf("right param error: %v", err)
+	}
+
+	if left.Kind != right.Kind {
+		return false, fmt.Errorf("type mismatch: cannot calc %v with %v", left.Kind, right.Kind)
+	}
+
+	switch left.Kind {
+	case TypeFloat64:
+		return binaryNumbers(left.Value.(float64), op, right.Value.(float64))
+	case TypeString:
+		return binaryStrings(left.Value.(string), op, right.Value.(string))
+	case TypeBool:
+		return binaryBools(left.Value.(bool), op, right.Value.(bool))
+	default:
+		return false, fmt.Errorf("unsupported type for comparison")
+	}
+}
+
+func binaryNumbers(left float64, op token.TokenType, right float64) (any, error) {
+	switch op {
+	case token.PLUS:
+		return left + right, nil
+	case token.MINUS:
+		return left - right, nil
+	case token.MUL:
+		return left * right, nil
+	case token.DIV:
+		return left / right, nil
+	default:
+		return false, fmt.Errorf("invalid operator '%v' for numbers", op)
+	}
+}
+
+func binaryStrings(left string, op token.TokenType, right string) (string, error) {
+	switch op {
+	case token.PLUS:
+		return left + right, nil
+	case token.MINUS, token.MUL, token.DIV:
+		return "", fmt.Errorf("invalid operator '%v' for strings", op)
+	default:
+		return "", fmt.Errorf("invalid operator '%v' for strings", op)
+	}
+}
+
+func binaryBools(left bool, op token.TokenType, right bool) (bool, error) {
+	return false, fmt.Errorf("invalid operator '%v' for booleans", op)
 }
 
 type ComparableType int
@@ -134,33 +198,26 @@ type InternalValue struct {
 }
 
 func CompareVal(leftVal any, op token.TokenType, rightVal any) (bool, error) {
-	// 第一步：解析左侧值
 	left, err := ResolveValue(leftVal)
 	if err != nil {
 		return false, fmt.Errorf("left param error: %v", err)
 	}
 
-	// 第二步：解析右侧值
 	right, err := ResolveValue(rightVal)
 	if err != nil {
 		return false, fmt.Errorf("right param error: %v", err)
 	}
 
-	// 第三步：检查类型是否兼容
-	// 只有相同类型才能比较 (例如数字不能和字符串比较)
 	if left.Kind != right.Kind {
 		return false, fmt.Errorf("type mismatch: cannot compare %v with %v", left.Kind, right.Kind)
 	}
 
-	// 第四步：根据类型分发比较逻辑
 	switch left.Kind {
 	case TypeFloat64:
 		return compareNumbers(left.Value.(float64), op, right.Value.(float64))
 	case TypeString:
 		return compareStrings(left.Value.(string), op, right.Value.(string))
 	case TypeBool:
-		// 布尔值通常只支持相等性判断 (==, !=)
-		// 如果你需要 true > false 这样的逻辑，可以在这里扩展
 		return compareBools(left.Value.(bool), op, right.Value.(bool))
 	default:
 		return false, fmt.Errorf("unsupported type for comparison")

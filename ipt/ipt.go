@@ -97,13 +97,15 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		}
 	case *ast.AssignmentExpr:
 		var err error
-		name, err := i.Eval(n.Left, env)
-		val, err := i.Eval(n.Right, env)
-		nameKey, ok := name.(token.Token)
+		operand, ok := n.Left.(*ast.Literal)
 		if !ok {
-			return nil, i.Errorf(*n.ID, "Invalid assignment target")
+			return nil, i.Errorf(n.Operator, "operand of assign must be a variable")
 		}
-		env.Set(nameKey, val)
+		if operand.Value.Type != token.IDENT {
+			return nil, i.Errorf(operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
+		}
+		val, err := i.Eval(n.Right, env)
+		env.Set(operand.Value, val)
 		return nil, err
 	case *ast.CompareExpr:
 		{
@@ -118,127 +120,14 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		{
 			var err error
 			leftRaw, err := i.Eval(n.Left, env)
+			if err != nil {
+				return nil, i.Errorf(n.Operator, err.Error())
+			}
 			rightRaw, err := i.Eval(n.Right, env)
-			leftVal, leftEnum, err := utils.GetNumberAndType(leftRaw)
-			isLeftInt := leftEnum == types.GNT_INT
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
 			}
-
-			/* 数字转换 */
-			rightVal, rightEnum, err := utils.GetNumberAndType(rightRaw)
-			isRightInt := rightEnum == types.GNT_INT
-			if err != nil {
-				return nil, i.Errorf(n.Operator, err.Error())
-			}
-
-			var result any
-
-			if isLeftInt && isRightInt {
-				lInt := leftVal.(int64)
-				rInt := rightVal.(int64)
-
-				switch n.Operator.Type {
-				case token.PLUS:
-					result = lInt + rInt
-				case token.MINUS:
-					result = lInt - rInt
-				case token.MUL:
-					result = lInt * rInt
-				case token.DIV:
-					if rInt == 0 {
-						return nil, i.Errorf(n.Operator, "Divide by zero")
-					}
-					result = lInt / rInt
-				}
-			} else {
-				switch n.Operator.Type {
-				case token.PLUS:
-					if isLeftInt {
-						if rightEnum == types.GNT_INT {
-							result = leftVal.(int64) + rightVal.(int64)
-						} else {
-							intVal, ok := leftVal.(int64)
-							if !ok {
-								return nil, i.Errorf(n.Operator, "Invalid operand type")
-							}
-							result = float64(intVal) + rightVal.(float64)
-						}
-					} else if isRightInt {
-						intVal, ok := rightVal.(int64)
-						if !ok {
-							return nil, i.Errorf(n.Operator, "Invalid operand type")
-						}
-						result = leftVal.(float64) + float64(intVal)
-					} else {
-						result = leftVal.(float64) + rightVal.(float64)
-					}
-				case token.MINUS:
-					if isLeftInt {
-						if rightEnum == types.GNT_INT {
-							result = leftVal.(int64) - rightVal.(int64)
-						} else {
-							intVal, ok := leftVal.(int64)
-							if !ok {
-								return nil, i.Errorf(n.Operator, "Invalid operand type")
-							}
-							result = float64(intVal) - rightVal.(float64)
-						}
-					} else if isRightInt {
-						intVal, ok := rightVal.(int64)
-						if !ok {
-							return nil, i.Errorf(n.Operator, "Invalid operand type")
-						}
-						result = leftVal.(float64) - float64(intVal)
-					} else {
-						result = leftVal.(float64) - rightVal.(float64)
-					}
-				case token.MUL:
-					if isLeftInt {
-						if rightEnum == types.GNT_INT {
-							result = leftVal.(int64) * rightVal.(int64)
-						} else {
-							intVal, ok := leftVal.(int64)
-							if !ok {
-								return nil, i.Errorf(n.Operator, "Invalid operand type")
-							}
-							result = float64(intVal) * rightVal.(float64)
-						}
-					} else if isRightInt {
-						intVal, ok := rightVal.(int64)
-						if !ok {
-							return nil, i.Errorf(n.Operator, "Invalid operand type")
-						}
-						result = leftVal.(float64) * float64(intVal)
-					} else {
-						result = leftVal.(float64) * rightVal.(float64)
-					}
-				case token.DIV:
-					if rightVal == 0 {
-						return nil, i.Errorf(n.Operator, "Divide by zero")
-					}
-					if isLeftInt {
-						if rightEnum == types.GNT_INT {
-							result = leftVal.(int64) / rightVal.(int64)
-						} else {
-							intVal, ok := leftVal.(int64)
-							if !ok {
-								return nil, i.Errorf(n.Operator, "Invalid operand type")
-							}
-							result = float64(intVal) / rightVal.(float64)
-						}
-					} else if isRightInt {
-						intVal, ok := rightVal.(int64)
-						if !ok {
-							return nil, i.Errorf(n.Operator, "Invalid operand type")
-						}
-						result = leftVal.(float64) / float64(intVal)
-					} else {
-						result = leftVal.(float64) / rightVal.(float64)
-					}
-				}
-			}
-
+			result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
 			return result, err
 		}
 	case *ast.ArgsExpr:
@@ -254,7 +143,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 				v, e := env.CallFunc(fn, args)
 				return v, e
 			} else {
-				return nil, i.Errorf(*n.ID, "Not a function")
+				return nil, i.Errorf(n.Callee.Value, "Not a function")
 			}
 		}
 	case *ast.UnaryExpr:
@@ -272,7 +161,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, i.Errorf(operand.Value, fmt.Sprintf("undefined variable: %s", operand.Value.Value))
 		}
 
-		var newVal interface{}
+		var newVal any
 
 		switch v := oldVal.(type) {
 		case int:
@@ -292,7 +181,6 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		} else {
 			return newVal, nil
 		}
-
 	case *ast.Literal:
 		if n.Value.Type == token.IDENT {
 			ok := types.LibsKeywords(n.Value.Value)
