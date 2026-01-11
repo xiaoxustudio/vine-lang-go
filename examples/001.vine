@@ -1,8 +1,11 @@
 use global
 # 这是一段代码
 let a = 2
-a = 2 + a
+a = 2 + a + "徐然"
+a = true
 print(a)
+print(true)
+print(false)
 
 # for let i = 0; i < 10; i++ :
 #     print(i)

@@ -278,7 +278,7 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 	tk := p.peek()
 
 	switch tk.Type {
-	case token.IDENT, token.STRING, token.NUMBER, token.NIL:
+	case token.IDENT, token.STRING, token.NUMBER, token.NIL, token.TRUE, token.FALSE:
 		p.advance()
 		return p.createLiteral(tk)
 	case token.LPAREN:

@@ -69,6 +69,8 @@ func TrasformPrintStringWithColor(args ...any) string {
 		switch current := args[i].(type) {
 		case string:
 			return fmt.Sprintf("%s%s%s", Color.Yellow, current, "\033[0m")
+		case bool:
+			return fmt.Sprintf("%s%v%s", Color.Cyan, current, "\033[0m")
 		case int, int64:
 			return fmt.Sprintf("%s%d%s", Color.Blue, current, "\033[0m")
 		case float32, float64:
@@ -82,6 +84,8 @@ func TrasformPrintStringWithColor(args ...any) string {
 				}
 			case token.NIL:
 				return fmt.Sprintf("%s%s%s", Color.Cyan, "nil", "\033[0m")
+			case token.TRUE, token.FALSE:
+				return fmt.Sprintf("%s%s%s", Color.Cyan, current.Value, "\033[0m")
 			}
 			return TrasformPrintStringWithColor(current.Value)
 		default:
@@ -138,6 +142,11 @@ func BinaryVal(leftVal any, op token.TokenType, rightVal any) (any, error) {
 	}
 
 	if left.Kind != right.Kind {
+		if left.Kind == TypeString && right.Kind == TypeFloat64 {
+			return binaryStrings(left.Value.(string), op, strconv.FormatFloat(right.Value.(float64), 'f', -1, 64))
+		} else if right.Kind == TypeString && left.Kind == TypeFloat64 {
+			return binaryStrings(strconv.FormatFloat(left.Value.(float64), 'f', -1, 64), op, right.Value.(string))
+		}
 		return false, fmt.Errorf("type mismatch: cannot calc %v with %v", left.Kind, right.Kind)
 	}
 
@@ -147,7 +156,7 @@ func BinaryVal(leftVal any, op token.TokenType, rightVal any) (any, error) {
 	case TypeString:
 		return binaryStrings(left.Value.(string), op, right.Value.(string))
 	case TypeBool:
-		return binaryBools(left.Value.(bool), op, right.Value.(bool))
+		return false, fmt.Errorf("invalid operator '%v' for booleans", op)
 	default:
 		return false, fmt.Errorf("unsupported type for comparison")
 	}
@@ -177,10 +186,6 @@ func binaryStrings(left string, op token.TokenType, right string) (string, error
 	default:
 		return "", fmt.Errorf("invalid operator '%v' for strings", op)
 	}
-}
-
-func binaryBools(left bool, op token.TokenType, right bool) (bool, error) {
-	return false, fmt.Errorf("invalid operator '%v' for booleans", op)
 }
 
 type ComparableType int
