@@ -16,7 +16,11 @@ func NewModule() types.LibsModule {
 			Store: make(types.LibsStoreMap),
 		},
 	}
-	g.LibsModuleInterface.Register("print", func(env any, rangeArgs []any) {
+	g.LibsModuleInterface.Register("print", func(env any, rangeArgs ...any) {
+		if len(rangeArgs) == 0 {
+			return
+		}
+
 		for _, arg := range rangeArgs {
 			fmt.Print(utils.TrasformPrintStringWithColor(arg))
 		}

@@ -99,14 +99,20 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 			}
 		}
 
-		args := []reflect.Value{
+		reflectArgs := []reflect.Value{
 			reflect.ValueOf(e),
-			reflect.ValueOf(args),
 		}
 
-		results := fnValue.Call(args)
+		for _, arg := range args {
+			reflectArgs = append(reflectArgs, reflect.ValueOf(arg))
+		}
 
-		return results, nil
+		results := fnValue.Call(reflectArgs)
+		if len(results) == 1 {
+			return results[0].Interface(), nil
+		}
+
+		return nil, nil
 	} else {
 		return nil, verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),

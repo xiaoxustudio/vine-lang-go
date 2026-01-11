@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"unicode"
@@ -88,6 +89,23 @@ func TrasformPrintStringWithColor(args ...any) string {
 				return fmt.Sprintf("%s%s%s", Color.Cyan, current.Value, "\033[0m")
 			}
 			return TrasformPrintStringWithColor(current.Value)
+		case reflect.Value:
+			switch current.Kind() {
+			case reflect.Bool:
+				return fmt.Sprintf("%s%v%s", Color.Cyan, current.Bool(), "\033[0m")
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				return fmt.Sprintf("%s%d%s", Color.Blue, current.Int(), "\033[0m")
+			case reflect.Float32, reflect.Float64:
+				return fmt.Sprintf("%s%g%s", Color.Green, current.Float(), "\033[0m")
+			case reflect.String:
+				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+			case reflect.Slice:
+				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+			case reflect.Map:
+				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+			default:
+				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+			}
 		default:
 			return fmt.Sprint(args...)
 		}

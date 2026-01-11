@@ -6,6 +6,7 @@ type LibsKeywords string
 const (
 	Unknown LibsKeywords = "unknown"
 	Global  LibsKeywords = "global"
+	Time    LibsKeywords = "time"
 )
 
 func (k LibsKeywords) IsUnknown() bool {
@@ -14,7 +15,7 @@ func (k LibsKeywords) IsUnknown() bool {
 
 func (k LibsKeywords) IsValidLibsKeyword() bool {
 	switch k {
-	case Unknown, Global:
+	case Unknown, Global, Time:
 		return true
 	default:
 		return false

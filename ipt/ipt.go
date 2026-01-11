@@ -136,6 +136,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		{
 			function, _ := i.Eval(n.Callee, env)
 			args := make([]any, len(n.Args.Arguments))
+
 			for ind, arg := range n.Args.Arguments {
 				args[ind], _ = i.Eval(arg, env)
 			}
@@ -209,7 +210,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, nil
 		}
 
-		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value))
+		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
 	case *ast.CommentStmt:
 		return nil, nil
 	}

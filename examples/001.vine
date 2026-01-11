@@ -1,11 +1,16 @@
 use global
+use time
+
+let nowTime = now()
+print(nowTime)
+
 # 这是一段代码
-let a = 2
-a = 2 + a + "徐然"
-a = true
-print(a)
-print(true)
-print(false)
+# let a = 2
+# a = 2 + a + "徐然"
+# a = true
+# print(a)
+# print(true)
+# print(1 == 2)
 
 # for let i = 0; i < 10; i++ :
 #     print(i)
@@ -16,3 +21,5 @@ print(false)
 # print(xuran)
 # print(nil)
 # print("打印这个：",a + 10)
+
+
