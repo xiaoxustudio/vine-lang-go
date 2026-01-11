@@ -15,8 +15,11 @@ func NewModule() types.LibsModule {
 			Store: make(types.LibsStoreMap),
 		},
 	}
-	g.LibsModuleInterface.Register("now", func(env any) any {
+	g.LibsModuleInterface.Register("Now", func(env any) any {
 		return time.Now().Unix()
+	})
+	g.LibsModuleInterface.Register("UnixMilli", func(env any) any {
+		return time.Now().UnixMilli()
 	})
 	return g
 }

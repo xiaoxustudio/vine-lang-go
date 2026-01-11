@@ -75,26 +75,47 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		env.Define(n.Name.Value, val)
 		return val, err
 	case *ast.ForStmt:
-		var newEnv = environment.New(env.FileName)
-		newEnv.Link(env)
 		if n.Range != nil {
 			return nil, nil
-		} else {
-			i.Eval(n.Init, newEnv)
-			for {
-				if res, err := i.Eval(n.Value, newEnv); err == nil {
-					if val, ok := res.(bool); ok && val {
-						i.Eval(n.Body, newEnv)
-						i.Eval(n.Update, newEnv)
-					} else {
-						break
-					}
-				} else {
+		}
+
+		loopEnv := environment.New(env.FileName)
+		loopEnv.Link(env)
+
+		if _, err := i.Eval(n.Init, loopEnv); err != nil {
+			return nil, err
+		}
+		var result any
+
+		for {
+			if n.Value != nil {
+				condVal, err := i.Eval(n.Value, loopEnv)
+				if err != nil {
+					return nil, err
+				}
+
+				isTrue, ok := condVal.(bool)
+				if !ok || !isTrue {
 					break
 				}
 			}
-			return nil, nil
+
+			bodyEnv := environment.New(env.FileName)
+			bodyEnv.Link(loopEnv)
+
+			res, err := i.Eval(n.Body, bodyEnv)
+			if err != nil {
+				return nil, err
+			}
+
+			if n.Update != nil {
+				if _, err := i.Eval(n.Update, loopEnv); err != nil {
+					return nil, err
+				}
+			}
+			result = res
 		}
+		return result, nil
 	case *ast.AssignmentExpr:
 		var err error
 		operand, ok := n.Left.(*ast.Literal)

@@ -1,8 +1,20 @@
 use global
 use time
 
-let nowTime = now()
-print(nowTime)
+let nowTime = UnixMilli()
+for let i = 0; i < 1000000 ; i++ :
+    let a = 123
+    let b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+end
+print("耗时：",UnixMilli() - nowTime,"ms")
 
 # 这是一段代码
 # let a = 2
