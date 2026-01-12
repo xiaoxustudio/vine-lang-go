@@ -34,6 +34,21 @@ func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVE
 	})
 }
 
+func toNumber(val any) (float64, bool) {
+	switch v := val.(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	default:
+		return 0, false
+	}
+}
+
 func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 	if node == nil || env == nil {
 		return nil, nil
@@ -72,7 +87,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:
 		val, err := i.Eval(n.Value, env)
-		env.Define(n.Name.Value, val)
+		env.Define(*n.Name.Value, val)
 		return val, err
 	case *ast.ForStmt:
 		if n.Range != nil {
@@ -94,16 +109,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 					return nil, err
 				}
 
-				isTrue, ok := condVal.(bool)
-				if !ok || !isTrue {
+				if isTrue, ok := condVal.(bool); !ok || !isTrue {
 					break
 				}
 			}
 
-			bodyEnv := environment.New(env.FileName)
+			bodyEnv := environment.NewPooled(env.FileName)
 			bodyEnv.Link(loopEnv)
 
 			res, err := i.Eval(n.Body, bodyEnv)
+
+			bodyEnv.Release()
+
 			if err != nil {
 				return nil, err
 			}
@@ -123,23 +140,45 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, i.Errorf(n.Operator, "operand of assign must be a variable")
 		}
 		if operand.Value.Type != token.IDENT {
-			return nil, i.Errorf(operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
+			return nil, i.Errorf(*operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
 		}
 		val, err := i.Eval(n.Right, env)
-		env.Set(operand.Value, val)
+		env.Set(*operand.Value, val)
 		return nil, err
 	case *ast.CompareExpr:
 		{
 			leftRaw, err := i.Eval(n.Left, env)
+			if err != nil {
+				return nil, i.Errorf(n.Operator, err.Error())
+			}
 			rightRaw, err := i.Eval(n.Right, env)
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
 			}
+
+			if leftNum, leftOk := toNumber(leftRaw); leftOk {
+				if rightNum, rightOk := toNumber(rightRaw); rightOk {
+					switch n.Operator.Type {
+					case token.EQ:
+						return leftNum == rightNum, nil
+					case token.NOT_EQ:
+						return leftNum != rightNum, nil
+					case token.LESS:
+						return leftNum < rightNum, nil
+					case token.LESS_EQ:
+						return leftNum <= rightNum, nil
+					case token.GREATER:
+						return leftNum > rightNum, nil
+					case token.GREATER_EQ:
+						return leftNum >= rightNum, nil
+					}
+				}
+			}
+
 			return utils.CompareVal(leftRaw, n.Operator.Type, rightRaw)
 		}
 	case *ast.BinaryExpr:
 		{
-			var err error
 			leftRaw, err := i.Eval(n.Left, env)
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
@@ -148,6 +187,22 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
 			}
+
+			if leftNum, leftOk := toNumber(leftRaw); leftOk {
+				if rightNum, rightOk := toNumber(rightRaw); rightOk {
+					switch n.Operator.Type {
+					case token.PLUS:
+						return leftNum + rightNum, nil
+					case token.MINUS:
+						return leftNum - rightNum, nil
+					case token.MUL:
+						return leftNum * rightNum, nil
+					case token.DIV:
+						return leftNum / rightNum, nil
+					}
+				}
+			}
+
 			result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
 			return result, err
 		}
@@ -165,7 +220,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 				v, e := env.CallFunc(fn, args)
 				return v, e
 			} else {
-				return nil, i.Errorf(n.Callee.Value, "Not a function")
+				return nil, i.Errorf(*n.Callee.Value, "Not a function")
 			}
 		}
 	case *ast.UnaryExpr:
@@ -175,28 +230,40 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		}
 
 		if operand.Value.Type != token.IDENT {
-			return nil, i.Errorf(operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
+			return nil, i.Errorf(*operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
 		}
 
-		oldVal, exists := env.Get(operand.Value)
+		oldVal, exists := env.Get(*operand.Value) // 解引用指针
 		if !exists {
-			return nil, i.Errorf(operand.Value, fmt.Sprintf("undefined variable: %s", operand.Value.Value))
+			return nil, i.Errorf(*operand.Value, fmt.Sprintf("undefined variable: %s", operand.Value.Value))
 		}
 
 		var newVal any
 
 		switch v := oldVal.(type) {
-		case int:
-			newVal = v + 1
 		case int64:
-			newVal = v + 1
+			if n.Operator.Type == token.INC {
+				newVal = v + 1
+			} else {
+				newVal = v - 1
+			}
 		case float64:
-			newVal = v + 1
+			if n.Operator.Type == token.INC {
+				newVal = v + 1
+			} else {
+				newVal = v - 1
+			}
+		case int:
+			if n.Operator.Type == token.INC {
+				newVal = v + 1
+			} else {
+				newVal = v - 1
+			}
 		default:
-			return nil, i.Errorf(operand.Value, fmt.Sprintf("invalid operation: ++ (non-numeric type %T)", v))
+			return nil, i.Errorf(*operand.Value, fmt.Sprintf("invalid operation: %s (non-numeric type %T)", n.Operator.Value, v))
 		}
 
-		env.Set(operand.Value, newVal)
+		env.Set(*operand.Value, newVal) // 解引用指针
 
 		if n.IsSuffix {
 			return oldVal, nil
@@ -204,23 +271,16 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return newVal, nil
 		}
 	case *ast.Literal:
-		if n.Value.Type == token.IDENT {
-			ok := types.LibsKeywords(n.Value.Value)
-			if ok.IsValidLibsKeyword() {
-				return n.Value, nil
-			}
-			if v, isGet := env.Get(n.Value); isGet {
-				if reflect.ValueOf(v).Kind() == reflect.Func {
-					// 内置函数
-					return n.Value, nil
-				}
-				return v, nil
-			}
-		}
 		switch n.Value.Type {
 		case token.NUMBER:
-			v, _, err := utils.GetNumberAndType(n.Value)
-			return v, err
+			num, isFloat, err := n.Value.GetNumber()
+			if err != nil {
+				return nil, err
+			}
+			if isFloat {
+				return num, nil
+			}
+			return int64(num), nil
 		case token.STRING:
 			return n.Value.Value, nil
 		case token.TRUE:
@@ -229,9 +289,20 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return false, nil
 		case token.NIL:
 			return nil, nil
+		case token.IDENT:
+			ok := types.LibsKeywords(n.Value.Value)
+			if ok.IsValidLibsKeyword() {
+				return *n.Value, nil
+			}
+			if v, isGet := env.Get(*n.Value); isGet {
+				if reflect.ValueOf(v).Kind() == reflect.Func {
+					return *n.Value, nil
+				}
+				return v, nil
+			}
+			i.Errorf(*n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
 		}
-
-		i.Errorf(n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
+		i.Errorf(*n.Value, fmt.Sprintf("Unknown literal type: %s", n.Value.Type))
 	case *ast.CommentStmt:
 		return nil, nil
 	}

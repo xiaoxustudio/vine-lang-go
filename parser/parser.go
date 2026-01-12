@@ -119,7 +119,7 @@ func (p *Parser) expect(types ...token.TokenType) Token {
 
 /* Creaters  */
 func (p *Parser) createLiteral(val token.Token) *ast.Literal {
-	return &ast.Literal{Value: val}
+	return &ast.Literal{Value: &val}
 }
 
 /* Parsers */

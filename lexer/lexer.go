@@ -68,10 +68,18 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
+	hasDecimal := false
 	for utils.IsDigit(l.ch) {
+		if l.ch == '.' {
+			if hasDecimal {
+				break
+			}
+			hasDecimal = true
+		}
 		l.readChar()
 	}
-	return l.input[position:l.position]
+	numStr := l.input[position:l.position]
+	return numStr
 }
 
 func (l *Lexer) GetToken() (token.Token, error) {

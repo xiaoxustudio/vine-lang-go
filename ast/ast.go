@@ -105,7 +105,7 @@ type SwitchCase interface {
 
 type Literal struct {
 	BaseNode
-	Value Token
+	Value *Token
 }
 
 func (l *Literal) String() string {

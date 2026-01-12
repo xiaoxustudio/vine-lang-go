@@ -15,11 +15,17 @@ type Token = token.Token
 type Environment struct {
 	parent   *Environment
 	store    map[Token]any
+	nameMap  map[string]Token
 	FileName string
 }
 
 func New(fileName string) *Environment {
-	e := &Environment{parent: nil, store: make(map[Token]any), FileName: fileName}
+	e := &Environment{
+		parent:   nil,
+		store:    make(map[Token]any),
+		nameMap:  make(map[string]Token), // for faster lookup
+		FileName: fileName,
+	}
 	return e
 }
 
@@ -28,23 +34,18 @@ func (e *Environment) Link(parent *Environment) {
 }
 
 func (e *Environment) Get(name Token) (any, bool) {
-	for k := range e.store {
-		if k.Value == name.Value {
-			return e.store[k], true
-		}
+	if tk, exists := e.nameMap[name.Value]; exists {
+		return e.store[tk], true
 	}
 	if e.parent != nil {
 		return e.parent.Get(name)
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 func (e *Environment) Lookup(name Token) (Environment, Token) {
-	for k := range e.store {
-		if k.Value == name.Value {
-			return *e, k
-		}
+	if tk, exists := e.nameMap[name.Value]; exists {
+		return *e, tk
 	}
 	if e.parent != nil {
 		return e.parent.Lookup(name)
@@ -73,11 +74,13 @@ func (e *Environment) Define(name Token, val any) {
 		})
 	} else {
 		e.store[name] = val
+		e.nameMap[name.Value] = name
 	}
 }
 
 func (e *Environment) Delete(name Token) {
 	delete(e.store, name)
+	delete(e.nameMap, name.Value)
 }
 
 func (e *Environment) Print() {
@@ -104,7 +107,15 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 		}
 
 		for _, arg := range args {
-			reflectArgs = append(reflectArgs, reflect.ValueOf(arg))
+			// reflect cannot handle nil
+			if arg == nil {
+				reflectArgs = append(reflectArgs, reflect.ValueOf(Token{
+					Type:  token.NIL,
+					Value: "nil",
+				}))
+			} else {
+				reflectArgs = append(reflectArgs, reflect.ValueOf(arg))
+			}
 		}
 
 		results := fnValue.Call(reflectArgs)

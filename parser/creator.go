@@ -22,7 +22,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 
 		idTk := p.expect(token.IDENT)
 
-		id := &ast.Literal{Value: idTk}
+		id := &ast.Literal{Value: &idTk}
 		p.expect(token.ASSIGN)
 
 		value := p.parseExpression()
