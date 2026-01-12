@@ -15,12 +15,8 @@ func NewModule() types.LibsModule {
 			Store: make(types.LibsStoreMap),
 		},
 	}
-	g.LibsModuleInterface.Register("Now", func(env any) any {
-		return time.Now().Unix()
-	})
-	g.LibsModuleInterface.Register("UnixMilli", func(env any) any {
-		return time.Now().UnixMilli()
-	})
+	g.LibsModuleInterface.Register("Now", Now)
+	g.LibsModuleInterface.Register("Milli", Milli)
 	return g
 }
 
@@ -34,4 +30,12 @@ func (g *TimeModule) Name() string {
 
 func (g *TimeModule) IsInside() bool {
 	return true
+}
+
+/* FN */
+func Now(env any) any {
+	return time.Now().Unix()
+}
+func Milli(env any) any {
+	return time.Now().UnixMilli()
 }

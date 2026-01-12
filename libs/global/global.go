@@ -16,16 +16,7 @@ func NewModule() types.LibsModule {
 			Store: make(types.LibsStoreMap),
 		},
 	}
-	g.LibsModuleInterface.Register("print", func(env any, rangeArgs ...any) {
-		if len(rangeArgs) == 0 {
-			return
-		}
-
-		for _, arg := range rangeArgs {
-			fmt.Print(utils.TrasformPrintStringWithColor(arg))
-		}
-		fmt.Println()
-	})
+	g.LibsModuleInterface.Register("print", Print)
 	return g
 }
 
@@ -39,4 +30,16 @@ func (g *GlobalModule) Name() string {
 
 func (g *GlobalModule) IsInside() bool {
 	return true
+}
+
+/* FN */
+func Print(env any, rangeArgs ...any) {
+	if len(rangeArgs) == 0 {
+		return
+	}
+
+	for _, arg := range rangeArgs {
+		fmt.Print(utils.TrasformPrintStringWithColor(arg))
+	}
+	fmt.Println()
 }
