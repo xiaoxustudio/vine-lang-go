@@ -206,6 +206,8 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		if peek == '\n' {
 			tok = token.NewToken(token.NEWLINE, l.ch, l.column, l.line)
 			l.readChar()
+			l.line += 1
+			l.column = 0
 		} else {
 			// unknown \r token
 			return token.NewToken(token.ILLEGAL, l.ch, l.column, l.line), &verror.LexerVError{
