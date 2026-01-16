@@ -1,0 +1,5 @@
+use global
+
+let a = GLOBAL.Test
+
+print(a)

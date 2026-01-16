@@ -290,18 +290,18 @@ type ObjectExpr struct {
 	Properties []*Property
 }
 
-// ArrayExpr (原 items 为 Property 数组，这里假设应该是 Expr 或类似结构，按原样定义)
+// ArrayExpr
 type ArrayExpr struct {
 	BaseNode
-	Items []*Property // TypeScript 中定义为 Property 数组，此处保持一致
+	Items []*Property
 }
 
 // MemberExpr
 type MemberExpr struct {
 	BaseNode
 	Object   Expr
-	Property Expr // 或 []Expr，视具体语法而定，通常单一属性
-	Computed bool
+	Property Expr
+	Computed bool // 是否为计算属性 xxx[xxx]
 }
 
 // BinaryExpr

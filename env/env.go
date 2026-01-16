@@ -6,6 +6,7 @@ import (
 	"vine-lang/libs"
 	"vine-lang/token"
 	"vine-lang/types"
+	"vine-lang/types/store"
 	LibsUtils "vine-lang/utils"
 	"vine-lang/verror"
 )
@@ -13,6 +14,7 @@ import (
 type Token = token.Token
 
 type Environment struct {
+	types.Scope
 	parent   *Environment
 	store    map[Token]any
 	nameMap  map[string]Token
@@ -26,6 +28,10 @@ func New(fileName string) *Environment {
 		nameMap:  make(map[string]Token), // for faster lookup
 		FileName: fileName,
 	}
+
+	lc := store.NewStoreObject()
+	lc.Define(token.Token{Type: token.IDENT, Value: "Test"}, "Test")
+	e.Define(token.Token{Type: token.IDENT, Value: "GLOBAL"}, lc)
 	return e
 }
 

@@ -206,6 +206,41 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
 			return result, err
 		}
+	case *ast.MemberExpr:
+		obj, err := i.Eval(n.Object, env)
+		if obj == nil {
+			return nil, i.Errorf(token.Token{}, "nil object")
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		var p token.Token
+		if n.Computed {
+			pVal, err := i.Eval(n.Property, env)
+			if err != nil {
+				return nil, err
+			}
+			p = pVal.(token.Token)
+			return nil, i.Errorf(p, "computed property not supported")
+		} else {
+			val, ok := reflect.ValueOf(n.Property).Interface().(*ast.Literal)
+
+			if !ok {
+				return nil, i.Errorf(token.Token{}, "Invalid property name")
+			}
+			p = *val.Value
+		}
+
+		if m, ok := obj.(types.Scope); ok {
+			if v, ok := m.Get(p); ok {
+				return v, nil
+			} else {
+				return nil, i.Errorf(p, "undefined property")
+			}
+		}
+
+		return nil, nil
 	case *ast.ArgsExpr:
 		return n, nil
 	case *ast.CallExpr:

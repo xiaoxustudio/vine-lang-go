@@ -13,7 +13,8 @@ type Val interface {
 }
 type ValNode struct {
 	Val
-	Token *token.Token
+	Token  *token.Token
+	Object any
 }
 
 func (v *ValNode) value() any {

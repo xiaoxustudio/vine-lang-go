@@ -32,7 +32,7 @@ func main() {
 			fmt.Println(r)
 		}
 	}()
-	bytes, _ := os.ReadFile("./examples/001.vine")
+	bytes, _ := os.ReadFile("./examples/002.vine")
 	var lex = lexer.New("main.vine", string(bytes))
 	lex.Parse()
 	// lex.Print()

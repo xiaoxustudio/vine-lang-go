@@ -221,7 +221,7 @@ func (p *Parser) parseBinaryExpression() ast.Expr {
 		return nil
 	}
 	opMap := []token.TokenType{token.PLUS, token.MINUS, token.DIV, token.MUL}
-	left := p.parseCallExpression()
+	left := p.parseMemberExpression()
 	if slices.Contains(opMap, p.peek().Type) {
 		op := p.advance()
 		right := p.parseBinaryExpression()
@@ -246,6 +246,19 @@ func (p *Parser) parseArgs() *ast.ArgsExpr {
 		node.Arguments = append(node.Arguments, expr)
 	}
 	return node
+}
+
+func (p *Parser) parseMemberExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseCallExpression()
+	if p.peek().Type == token.DOT {
+		p.advance()
+		right := p.parseMemberExpression()
+		return &ast.MemberExpr{Object: left, Property: right}
+	}
+	return left
 }
 
 func (p *Parser) parseCallExpression() ast.Expr {
