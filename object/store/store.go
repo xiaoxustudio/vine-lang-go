@@ -2,8 +2,8 @@ package store
 
 import (
 	"fmt"
+	"go/types"
 	"vine-lang/token"
-	"vine-lang/types"
 	LibsUtils "vine-lang/utils"
 	"vine-lang/verror"
 )

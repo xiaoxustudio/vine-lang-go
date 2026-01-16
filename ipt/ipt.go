@@ -6,6 +6,7 @@ import (
 	"vine-lang/ast"
 	"vine-lang/env"
 	environment "vine-lang/env"
+	"vine-lang/object/store"
 	"vine-lang/parser"
 	"vine-lang/token"
 	"vine-lang/types"
@@ -225,22 +226,27 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, i.Errorf(p, "computed property not supported")
 		} else {
 			val, ok := reflect.ValueOf(n.Property).Interface().(*ast.Literal)
-
 			if !ok {
 				return nil, i.Errorf(token.Token{}, "Invalid property name")
 			}
 			p = *val.Value
 		}
 
-		if m, ok := obj.(types.Scope); ok {
+		/* 对象 */
+		if m, ok := obj.(*store.StoreObject); ok {
 			if v, ok := m.Get(p); ok {
 				return v, nil
-			} else {
-				return nil, i.Errorf(p, "undefined property")
 			}
 		}
 
-		return nil, nil
+		/* 模块 */
+		if m, ok := obj.(types.LibsModule); ok {
+			if v, ok := m.Get(p); ok {
+				return v, nil
+			}
+		}
+
+		return nil, i.Errorf(p, fmt.Sprintf("property %s not found", p.Value))
 	case *ast.ArgsExpr:
 		return n, nil
 	case *ast.CallExpr:
@@ -251,14 +257,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			for ind, arg := range n.Args.Arguments {
 				args[ind], _ = i.Eval(arg, env)
 			}
+
 			if fn, ok := function.(token.Token); ok {
 				v, e := env.CallFunc(fn, args)
 				return v, e
+			} else if reflect.ValueOf(function).Kind() == reflect.Func {
+				return env.CallFuncObject(function, args)
 			} else {
-				return nil, i.Errorf(*n.Callee.Value, "Not a function")
+				return nil, i.Errorf(token.Token{}, "Not a function")
 			}
 		}
 	case *ast.UnaryExpr:
+
 		operand, ok := n.Value.(*ast.Literal)
 		if !ok {
 			return nil, i.Errorf(n.Operator, "operand of increment/decrement must be a variable")
@@ -326,14 +336,14 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, nil
 		case token.IDENT:
 			ok := types.LibsKeywords(n.Value.Value)
-			if ok.IsValidLibsKeyword() {
-				return *n.Value, nil
-			}
 			if v, isGet := env.Get(*n.Value); isGet {
 				if reflect.ValueOf(v).Kind() == reflect.Func {
 					return *n.Value, nil
 				}
 				return v, nil
+			}
+			if ok.IsValidLibsKeyword() {
+				return *n.Value, nil
 			}
 			i.Errorf(*n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
 		}
@@ -356,6 +366,7 @@ func (i *Interpreter) EvalSafe() (any, error) {
 		}
 	}()
 	ast := i.p.ParseProgram()
+	// ast.Print()
 	v, e := i.Eval(ast, i.env)
 	if e != nil {
 		panic(e)

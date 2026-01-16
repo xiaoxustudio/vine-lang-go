@@ -7,16 +7,16 @@ import (
 )
 
 type GlobalModule struct {
-	types.LibsModuleInterface
+	types.LibsModuleObject
 }
 
 func NewModule() types.LibsModule {
 	g := &GlobalModule{
-		LibsModuleInterface: types.LibsModuleInterface{
-			Store: make(types.LibsStoreMap),
+		LibsModuleObject: types.LibsModuleObject{
+			Store: *types.NewStoreObject(),
 		},
 	}
-	g.LibsModuleInterface.Register("print", Print)
+	g.LibsModuleObject.Register("print", Print)
 	return g
 }
 
@@ -26,10 +26,6 @@ func (g *GlobalModule) ID() types.LibsKeywords {
 
 func (g *GlobalModule) Name() string {
 	return "global"
-}
-
-func (g *GlobalModule) IsInside() bool {
-	return true
 }
 
 /* FN */

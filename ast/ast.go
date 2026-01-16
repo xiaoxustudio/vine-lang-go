@@ -254,7 +254,7 @@ func (a *ArgsExpr) String() string {
 // CallExpr
 type CallExpr struct {
 	BaseNode
-	Callee *Literal
+	Callee Expr
 	Args   ArgsExpr
 }
 
@@ -302,6 +302,10 @@ type MemberExpr struct {
 	Object   Expr
 	Property Expr
 	Computed bool // 是否为计算属性 xxx[xxx]
+}
+
+func (m *MemberExpr) String() string {
+	return fmt.Sprintf("MemberExpr(%s.%s)", m.Object.String(), m.Property.String())
 }
 
 // BinaryExpr

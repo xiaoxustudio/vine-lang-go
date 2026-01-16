@@ -1,5 +1,8 @@
-use global
+use glb
+use time
 
 let a = GLOBAL.Test
+let now = time.Now()
 
-print(a)
+glb.print(a)
+glb.print(now)

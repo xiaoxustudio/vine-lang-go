@@ -1,12 +1,13 @@
 package env
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"vine-lang/libs"
+	"vine-lang/object/store"
 	"vine-lang/token"
 	"vine-lang/types"
-	"vine-lang/types/store"
 	LibsUtils "vine-lang/utils"
 	"vine-lang/verror"
 )
@@ -138,12 +139,42 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 	}
 }
 
+func (e *Environment) CallFuncObject(fnObject any, args []any) (any, error) {
+	fnObj := reflect.ValueOf(fnObject)
+	if fnObj.Kind() == reflect.Func {
+		reflectArgs := []reflect.Value{
+			reflect.ValueOf(e),
+		}
+
+		for _, arg := range args {
+			// reflect cannot handle nil
+			if arg == nil {
+				reflectArgs = append(reflectArgs, reflect.ValueOf(Token{
+					Type:  token.NIL,
+					Value: "nil",
+				}))
+			} else {
+				reflectArgs = append(reflectArgs, reflect.ValueOf(arg))
+			}
+		}
+
+		results := fnObj.Call(reflectArgs)
+		if len(results) == 1 {
+			return results[0].Interface(), nil
+		}
+
+		return nil, nil
+	} else {
+		return nil, errors.New("Not a function to Call")
+	}
+}
+
 func (e *Environment) ImportModule(name string) {
 	if v, ok := libs.LibsMap[types.LibsKeywords(name)]; ok {
-		for fnName, fnValue := range v.Return() {
-			e.Define(Token{Type: token.IDENT, Value: fnName, Line: 0, Column: 0}, fnValue)
-		}
-		e.Define(Token{Type: token.IDENT, Value: name, Line: 0, Column: 0}, 0)
+		v.ForEach(func(tk token.Token, val any) {
+			e.Define(tk, val)
+		})
+		e.Define(Token{Type: token.IDENT, Value: name}, v)
 	} else {
 		panic(verror.InterpreterVError{
 			Position: Token{}.ToPosition(e.FileName),

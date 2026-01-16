@@ -6,17 +6,17 @@ import (
 )
 
 type TimeModule struct {
-	types.LibsModuleInterface
+	types.LibsModuleObject
 }
 
 func NewModule() types.LibsModule {
 	g := &TimeModule{
-		LibsModuleInterface: types.LibsModuleInterface{
-			Store: make(types.LibsStoreMap),
+		LibsModuleObject: types.LibsModuleObject{
+			Store: *types.NewStoreObject(),
 		},
 	}
-	g.LibsModuleInterface.Register("Now", Now)
-	g.LibsModuleInterface.Register("Milli", Milli)
+	g.LibsModuleObject.Register("Now", Now)
+	g.LibsModuleObject.Register("Milli", Milli)
 	return g
 }
 
