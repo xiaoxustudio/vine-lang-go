@@ -1,8 +1,8 @@
-use global
+use glb
 use time
 # print(xuran)
 
-let nowTime = Milli()
+let nowTime = time.Milli()
 for let i = 0; i < 1000000 ; i++ :
     let a = 123
     let b = a + a * a
@@ -15,19 +15,19 @@ for let i = 0; i < 1000000 ; i++ :
     b = a + a * a
     b = a + a * a
 end
-print("耗时：",Milli() - nowTime,"ms")
+glb.print("耗时：",time.Milli() - nowTime,"ms")
 
 # 这是一段代码
 # let a = 2
 # a = 2 + a + "徐然"
 # a = true
-# print(a)
-# print(true)
-# print(1 == 2)
+# glb.print(a)
+# glb.print(true)
+# glb.print(1 == 2)
 # for let i = 0; i < 10; i++ :
-#     print(i)
+#     glb.print(i)
 # end
-# print(a)
-# print(a + 10)
-# print("打印这个：",a + 10)
-# print(nil)
+# glb.print(a)
+# glb.print(a + 10)
+# glb.print("打印这个：",a + 10)
+# glb.print(nil)

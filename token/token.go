@@ -19,7 +19,8 @@ const (
 
 	// Identifiers and literals
 	IDENT  TokenType = "IDENT"
-	NUMBER TokenType = "NUMBER"
+	INT    TokenType = "INT"
+	FLOAT  TokenType = "FLOAT"
 	STRING TokenType = "STRING"
 
 	// Operators
@@ -111,13 +112,10 @@ var Keywords = map[string]TokenType{
 }
 
 type Token struct {
-	Type      TokenType
-	Value     string  // 字符串原始值
-	Line      int     // 行号
-	Column    int     // 列号
-	cachedNum float64 // 缓存的数值
-	numCached bool    // 是否已缓存数值
-	isFloat   bool    // 是否是浮点数
+	Type   TokenType
+	Value  string // 字符串原始值
+	Line   int    // 行号
+	Column int    // 列号
 }
 
 func NewToken(t TokenType, v rune, col, line int) Token {
@@ -153,34 +151,26 @@ func (t Token) IsEmpty() bool {
 	return t == (Token{})
 }
 
-func (t *Token) GetNumber() (float64, bool, error) {
-	if t.Type != NUMBER {
-		return 0, false, nil
+func (t *Token) GetInt() (int64, error) {
+	if t.Type != INT {
+		return 0, fmt.Errorf("token is not INT type")
 	}
+	i, err := strconv.ParseInt(t.Value, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return i, nil
+}
 
-	if t.numCached {
-		return t.cachedNum, t.isFloat, nil
+func (t *Token) GetFloat() (float64, error) {
+	if t.Type != FLOAT {
+		return 0, fmt.Errorf("token is not FLOAT type")
 	}
-
-	if strings.Contains(t.Value, ".") {
-		f, err := strconv.ParseFloat(t.Value, 64)
-		if err != nil {
-			return 0, false, err
-		}
-		t.cachedNum = f
-		t.isFloat = true
-		t.numCached = true
-		return f, true, nil
-	} else {
-		i, err := strconv.Atoi(t.Value)
-		if err != nil {
-			return 0, false, err
-		}
-		t.cachedNum = float64(i)
-		t.isFloat = false
-		t.numCached = true
-		return t.cachedNum, false, nil
+	f, err := strconv.ParseFloat(t.Value, 64)
+	if err != nil {
+		return 0, err
 	}
+	return f, nil
 }
 
 func LookupIdent(ident string) TokenType {

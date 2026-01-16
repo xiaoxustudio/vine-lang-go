@@ -181,56 +181,11 @@ func (p *Parser) parseAssignmentExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	left := p.parseCallExpression()
+	left := p.parseLogicalExpression()
 	if p.peek().Type == token.ASSIGN {
 		op := p.expect(token.ASSIGN)
 		right := p.parseAssignmentExpression()
 		return &ast.AssignmentExpr{Left: left, Right: right, Operator: op}
-	}
-	return left
-}
-
-func (p *Parser) parseArgs() *ast.ArgsExpr {
-	if p.isEof() {
-		return nil
-	}
-	var node = &ast.ArgsExpr{Arguments: []ast.Expr{}}
-	for !p.isEof() && p.peek().Type != token.RPAREN {
-		expr := p.parseExpression()
-		if expr == nil {
-			break
-		}
-		if p.peek().Type == token.COMMA {
-			p.advance()
-		}
-		node.Arguments = append(node.Arguments, expr)
-	}
-	return node
-}
-
-func (p *Parser) parseCallExpression() ast.Expr {
-	if p.isEof() {
-		return nil
-	}
-	left := p.parseMemberExpression()
-	if p.peek().Type == token.LPAREN {
-		p.advance()
-		args := p.parseArgs()
-		p.expect(token.RPAREN)
-		return &ast.CallExpr{Callee: left, Args: *args}
-	}
-	return left
-}
-
-func (p *Parser) parseMemberExpression() ast.Expr {
-	if p.isEof() {
-		return nil
-	}
-	left := p.parseLogicalExpression()
-	if p.peek().Type == token.DOT {
-		p.advance()
-		right := p.parseMemberExpression()
-		return &ast.MemberExpr{Object: left, Property: right}
 	}
 	return left
 }
@@ -266,11 +221,56 @@ func (p *Parser) parseBinaryExpression() ast.Expr {
 		return nil
 	}
 	opMap := []token.TokenType{token.PLUS, token.MINUS, token.DIV, token.MUL}
-	left := p.parseSuffixExpression()
+	left := p.parseCallExpression()
 	if slices.Contains(opMap, p.peek().Type) {
 		op := p.advance()
 		right := p.parseBinaryExpression()
 		return &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+	}
+	return left
+}
+
+func (p *Parser) parseArgs() *ast.ArgsExpr {
+	if p.isEof() {
+		return nil
+	}
+	var node = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+	for !p.isEof() && p.peek().Type != token.RPAREN {
+		expr := p.parseExpression()
+		if expr == nil {
+			break
+		}
+		if p.peek().Type == token.COMMA {
+			p.advance()
+		}
+		node.Arguments = append(node.Arguments, expr)
+	}
+	return node
+}
+
+func (p *Parser) parseCallExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseMemberExpression()
+	for p.peek().Type == token.LPAREN {
+		p.advance()
+		args := p.parseArgs()
+		p.expect(token.RPAREN)
+		left = &ast.CallExpr{Callee: left, Args: *args}
+	}
+	return left
+}
+
+func (p *Parser) parseMemberExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseSuffixExpression()
+	if p.peek().Type == token.DOT {
+		p.advance()
+		right := p.parseMemberExpression()
+		return &ast.MemberExpr{Object: left, Property: right}
 	}
 	return left
 }
@@ -291,7 +291,7 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 	tk := p.peek()
 
 	switch tk.Type {
-	case token.IDENT, token.STRING, token.NUMBER, token.NIL, token.TRUE, token.FALSE:
+	case token.IDENT, token.STRING, token.INT, token.FLOAT, token.NIL, token.TRUE, token.FALSE:
 		p.advance()
 		return p.createLiteral(tk)
 	case token.LPAREN:
@@ -302,9 +302,9 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 	case token.NEWLINE, token.WHITESPACE, token.COMMENT:
 		p.advance()
 		return p.parsePrimaryExpression()
-	case token.NOT, token.DEC, token.INC:
+	case token.NOT, token.MINUS, token.DEC, token.INC:
 		op := p.advance()
-		right := p.parseExpression()
+		right := p.parseSuffixExpression()
 		return &ast.UnaryExpr{Operator: op, Value: right, IsSuffix: false}
 	default:
 		p.errorf(tk, "unexpected token: %s", tk.String())

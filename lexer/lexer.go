@@ -66,10 +66,10 @@ func (l *Lexer) readIdentifier() string {
 	return l.input[position:l.position]
 }
 
-func (l *Lexer) readNumber() string {
+func (l *Lexer) readNumber() (string, bool) {
 	position := l.position
 	hasDecimal := false
-	for utils.IsDigit(l.ch) {
+	for utils.IsDigitOrDot(l.ch) {
 		if l.ch == '.' {
 			if hasDecimal {
 				break
@@ -79,7 +79,7 @@ func (l *Lexer) readNumber() string {
 		l.readChar()
 	}
 	numStr := l.input[position:l.position]
-	return numStr
+	return numStr, hasDecimal
 }
 
 func (l *Lexer) GetToken() (token.Token, error) {
@@ -126,16 +126,7 @@ func (l *Lexer) GetToken() (token.Token, error) {
 			tok = token.NewTokenDuplicated(token.DEC_EQ, l.ch, l.column, l.line, peek)
 			l.readChar()
 		default:
-			if utils.IsDigit(peek) {
-				l.readChar()
-				num := l.readNumber()
-				tok.Value = "-" + num
-				tok.Column = l.column
-				tok.Line = l.line
-				tok.Type = token.NUMBER
-			} else {
-				tok = token.NewToken(token.MINUS, l.ch, l.column, l.line)
-			}
+			tok = token.NewToken(token.MINUS, l.ch, l.column, l.line)
 		}
 	case '*':
 		peek := l.peekRune()
@@ -247,8 +238,13 @@ func (l *Lexer) GetToken() (token.Token, error) {
 			tok.Line = l.line
 			return tok, nil
 		} else if utils.IsDigit(l.ch) {
-			tok.Value = l.readNumber()
-			tok.Type = token.NUMBER
+			var isFloat bool
+			tok.Value, isFloat = l.readNumber()
+			if isFloat {
+				tok.Type = token.FLOAT
+			} else {
+				tok.Type = token.INT
+			}
 			tok.Column = l.column
 			tok.Line = l.line
 			return tok, nil

@@ -3,6 +3,8 @@ use time
 
 let a = GLOBAL.Test
 let now = time.Now()
+glb.print(now)
+let b = now + 1
+glb.print(b)
 
 glb.print(a)
-glb.print(now)

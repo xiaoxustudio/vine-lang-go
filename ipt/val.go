@@ -1,7 +1,6 @@
 package ipt
 
 import (
-	"strconv"
 	"vine-lang/ast"
 	"vine-lang/token"
 )
@@ -19,9 +18,12 @@ type ValNode struct {
 
 func (v *ValNode) value() any {
 	switch v.Token.Type {
-	case token.NUMBER:
-		Val, _ := strconv.Atoi(v.Token.Value)
-		return Val
+	case token.INT:
+		val, _ := v.Token.GetInt()
+		return val
+	case token.FLOAT:
+		val, _ := v.Token.GetFloat()
+		return val
 	case token.STRING:
 		return v.Token.Value
 	case token.TRUE:

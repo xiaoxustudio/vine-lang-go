@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"unicode"
 	"vine-lang/token"
 	"vine-lang/types"
@@ -15,6 +14,10 @@ func IsIdentifier(ch rune) bool {
 }
 
 func IsDigit(ch rune) bool {
+	return unicode.IsDigit(ch)
+}
+
+func IsDigitOrDot(ch rune) bool {
 	return unicode.IsDigit(ch) || ch == '.'
 }
 
@@ -78,7 +81,7 @@ func TrasformPrintStringWithColor(args ...any) string {
 			return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
 		case token.Token:
 			switch current.Type {
-			case token.NUMBER:
+			case token.INT, token.FLOAT:
 				val, _, err := GetNumberAndType(current)
 				if err == nil {
 					return TrasformPrintStringWithColor(val)
@@ -118,20 +121,18 @@ func GetNumberAndType(v any) (any, types.GetNumberAndTypeENUM, error) {
 	switch val := v.(type) {
 	case token.Token:
 		switch val.Type {
-		case token.NUMBER:
-			if strings.Contains(val.Value, ".") {
-				f, err := strconv.ParseFloat(val.Value, 64)
-				if err != nil {
-					return 0, types.GNT_FLOAT, err
-				}
-				return f, types.GNT_FLOAT, nil
-			} else {
-				i, err := strconv.Atoi(val.Value)
-				if err != nil {
-					return 0, types.GNT_INT, err
-				}
-				return int64(i), types.GNT_INT, nil
+		case token.INT:
+			i, err := val.GetInt()
+			if err != nil {
+				return 0, types.GNT_INT, err
 			}
+			return i, types.GNT_INT, nil
+		case token.FLOAT:
+			f, err := val.GetFloat()
+			if err != nil {
+				return 0, types.GNT_FLOAT, err
+			}
+			return f, types.GNT_FLOAT, nil
 		case token.STRING:
 			return val.Value, types.GNT_STRING, nil
 		default:
@@ -253,10 +254,16 @@ func ResolveValue(val any) (InternalValue, error) {
 		return ParseTokenToValue(v)
 	case token.Token:
 		return ParseTokenToValue(&v)
-	case int, int64, int32:
-		return InternalValue{Kind: TypeFloat64, Value: toFloat64(v)}, nil
-	case float64, float32:
-		return InternalValue{Kind: TypeFloat64, Value: toFloat64(v)}, nil
+	case int:
+		return InternalValue{Kind: TypeFloat64, Value: float64(v)}, nil
+	case int64:
+		return InternalValue{Kind: TypeFloat64, Value: float64(v)}, nil
+	case int32:
+		return InternalValue{Kind: TypeFloat64, Value: float64(v)}, nil
+	case float64:
+		return InternalValue{Kind: TypeFloat64, Value: v}, nil
+	case float32:
+		return InternalValue{Kind: TypeFloat64, Value: float64(v)}, nil
 	case string:
 		return InternalValue{Kind: TypeString, Value: v}, nil
 	case bool:
@@ -268,11 +275,16 @@ func ResolveValue(val any) (InternalValue, error) {
 
 func ParseTokenToValue(t *token.Token) (InternalValue, error) {
 	switch t.Type {
-	case token.NUMBER:
-		// 尝试将字符串值转为 float64
-		f, err := strconv.ParseFloat(t.Value, 64)
+	case token.INT:
+		i, err := t.GetInt()
 		if err != nil {
-			return InternalValue{}, fmt.Errorf("invalid number token '%s'", t.Value)
+			return InternalValue{}, fmt.Errorf("invalid int token '%s'", t.Value)
+		}
+		return InternalValue{Kind: TypeFloat64, Value: float64(i)}, nil
+	case token.FLOAT:
+		f, err := t.GetFloat()
+		if err != nil {
+			return InternalValue{}, fmt.Errorf("invalid float token '%s'", t.Value)
 		}
 		return InternalValue{Kind: TypeFloat64, Value: f}, nil
 
@@ -280,7 +292,6 @@ func ParseTokenToValue(t *token.Token) (InternalValue, error) {
 		return InternalValue{Kind: TypeString, Value: t.Value}, nil
 
 	case token.TRUE, token.FALSE:
-		// 尝试解析布尔字符串 "true" 或 "false"
 		b, err := strconv.ParseBool(t.Value)
 		if err != nil {
 			return InternalValue{}, fmt.Errorf("invalid bool token '%s'", t.Value)
@@ -341,7 +352,7 @@ func compareBools(left bool, op token.TokenType, right bool) (bool, error) {
 	}
 }
 
-func toFloat64(val interface{}) float64 {
+func toFloat64(val any) float64 {
 	switch v := val.(type) {
 	case int:
 		return float64(v)

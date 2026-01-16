@@ -35,21 +35,6 @@ func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVE
 	})
 }
 
-func toNumber(val any) (float64, bool) {
-	switch v := val.(type) {
-	case float64:
-		return v, true
-	case int:
-		return float64(v), true
-	case int64:
-		return float64(v), true
-	case int32:
-		return float64(v), true
-	default:
-		return 0, false
-	}
-}
-
 func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 	if node == nil || env == nil {
 		return nil, nil
@@ -147,37 +132,16 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		env.Set(*operand.Value, val)
 		return nil, err
 	case *ast.CompareExpr:
-		{
-			leftRaw, err := i.Eval(n.Left, env)
-			if err != nil {
-				return nil, i.Errorf(n.Operator, err.Error())
-			}
-			rightRaw, err := i.Eval(n.Right, env)
-			if err != nil {
-				return nil, i.Errorf(n.Operator, err.Error())
-			}
-
-			if leftNum, leftOk := toNumber(leftRaw); leftOk {
-				if rightNum, rightOk := toNumber(rightRaw); rightOk {
-					switch n.Operator.Type {
-					case token.EQ:
-						return leftNum == rightNum, nil
-					case token.NOT_EQ:
-						return leftNum != rightNum, nil
-					case token.LESS:
-						return leftNum < rightNum, nil
-					case token.LESS_EQ:
-						return leftNum <= rightNum, nil
-					case token.GREATER:
-						return leftNum > rightNum, nil
-					case token.GREATER_EQ:
-						return leftNum >= rightNum, nil
-					}
-				}
-			}
-
-			return utils.CompareVal(leftRaw, n.Operator.Type, rightRaw)
+		leftRaw, err := i.Eval(n.Left, env)
+		if err != nil {
+			return nil, i.Errorf(n.Operator, err.Error())
 		}
+		rightRaw, err := i.Eval(n.Right, env)
+		if err != nil {
+			return nil, i.Errorf(n.Operator, err.Error())
+		}
+
+		return utils.CompareVal(leftRaw, n.Operator.Type, rightRaw)
 	case *ast.BinaryExpr:
 		{
 			leftRaw, err := i.Eval(n.Left, env)
@@ -187,21 +151,6 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			rightRaw, err := i.Eval(n.Right, env)
 			if err != nil {
 				return nil, i.Errorf(n.Operator, err.Error())
-			}
-
-			if leftNum, leftOk := toNumber(leftRaw); leftOk {
-				if rightNum, rightOk := toNumber(rightRaw); rightOk {
-					switch n.Operator.Type {
-					case token.PLUS:
-						return leftNum + rightNum, nil
-					case token.MINUS:
-						return leftNum - rightNum, nil
-					case token.MUL:
-						return leftNum * rightNum, nil
-					case token.DIV:
-						return leftNum / rightNum, nil
-					}
-				}
 			}
 
 			result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
@@ -268,6 +217,30 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			}
 		}
 	case *ast.UnaryExpr:
+		if n.Operator.Type == token.MINUS || n.Operator.Type == token.NOT {
+			val, err := i.Eval(n.Value, env)
+			if err != nil {
+				return nil, err
+			}
+
+			if n.Operator.Type == token.MINUS {
+				switch v := val.(type) {
+				case int64:
+					return -v, nil
+				case float64:
+					return -v, nil
+				case int:
+					return -v, nil
+				default:
+					return nil, i.Errorf(n.Operator, fmt.Sprintf("invalid operation: - (non-numeric type %T)", v))
+				}
+			} else {
+				if b, ok := val.(bool); ok {
+					return !b, nil
+				}
+				return nil, i.Errorf(n.Operator, fmt.Sprintf("invalid operation: ! (non-boolean type %T)", val))
+			}
+		}
 
 		operand, ok := n.Value.(*ast.Literal)
 		if !ok {
@@ -278,7 +251,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, i.Errorf(*operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
 		}
 
-		oldVal, exists := env.Get(*operand.Value) // 解引用指针
+		oldVal, exists := env.Get(*operand.Value)
 		if !exists {
 			return nil, i.Errorf(*operand.Value, fmt.Sprintf("undefined variable: %s", operand.Value.Value))
 		}
@@ -308,7 +281,7 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			return nil, i.Errorf(*operand.Value, fmt.Sprintf("invalid operation: %s (non-numeric type %T)", n.Operator.Value, v))
 		}
 
-		env.Set(*operand.Value, newVal) // 解引用指针
+		env.Set(*operand.Value, newVal)
 
 		if n.IsSuffix {
 			return oldVal, nil
@@ -317,15 +290,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		}
 	case *ast.Literal:
 		switch n.Value.Type {
-		case token.NUMBER:
-			num, isFloat, err := n.Value.GetNumber()
+		case token.INT:
+			num, err := n.Value.GetInt()
 			if err != nil {
 				return nil, err
 			}
-			if isFloat {
-				return num, nil
+			return num, nil
+		case token.FLOAT:
+			num, err := n.Value.GetFloat()
+			if err != nil {
+				return nil, err
 			}
-			return int64(num), nil
+			return num, nil
 		case token.STRING:
 			return n.Value.Value, nil
 		case token.TRUE:
