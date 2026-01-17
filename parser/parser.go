@@ -220,12 +220,31 @@ func (p *Parser) parseBinaryExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	opMap := []token.TokenType{token.PLUS, token.MINUS, token.DIV, token.MUL}
-	left := p.parseCallExpression()
-	if slices.Contains(opMap, p.peek().Type) {
+	return p.parseAdditiveExpression()
+}
+
+func (p *Parser) parseAdditiveExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseMultiplicativeExpression()
+	for p.peek().Type == token.PLUS || p.peek().Type == token.MINUS {
 		op := p.advance()
-		right := p.parseBinaryExpression()
-		return &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+		right := p.parseMultiplicativeExpression()
+		left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+	}
+	return left
+}
+
+func (p *Parser) parseMultiplicativeExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	left := p.parseCallExpression()
+	for p.peek().Type == token.MUL || p.peek().Type == token.DIV {
+		op := p.advance()
+		right := p.parseCallExpression()
+		left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
 	}
 	return left
 }
