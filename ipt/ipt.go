@@ -119,6 +119,21 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 			result = res
 		}
 		return result, nil
+	case *ast.IfStmt:
+		condVal, err := i.Eval(n.Test, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if isTrue, ok := condVal.(bool); !ok || !isTrue {
+			if n.Alternate != nil {
+				return i.Eval(n.Alternate, env)
+			}
+			return nil, nil
+		}
+
+		return i.Eval(n.Consequent, env)
+	case *ast.ReturnStmt:
 	case *ast.AssignmentExpr:
 		var err error
 		operand, ok := n.Left.(*ast.Literal)

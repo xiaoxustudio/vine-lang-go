@@ -1,33 +1,24 @@
 use glb
 use time
-# print(xuran)
 
-let nowTime = time.Milli()
-for let i = 0; i < 1000000 ; i++ :
-    let a = 123
-    let b = a + a * a
-    b = a + a * a
-    b = a + a * a
-    b = a + a * a
-    b = a + a * a
-    b = a + a * a
-    b = a + a * a
-    b = a + a * a
-    b = a + a * a
+
+let a = 123
+
+if a == 1 :
+    glb.print("等于")
 end
-glb.print("耗时：",time.Milli() - nowTime,"ms")
 
-# 这是一段代码
-# let a = 2
-# a = 2 + a + "徐然"
-# a = true
-# glb.print(a)
-# glb.print(true)
-# glb.print(1 == 2)
-# for let i = 0; i < 10; i++ :
-#     glb.print(i)
-# end
-# glb.print(a)
-# glb.print(a + 10)
-# glb.print("打印这个：",a + 10)
-# glb.print(nil)
+
+if a == 222 :
+    glb.print("等于")
+else:
+    glb.print("不等于222")
+end
+
+if a == 222 :
+    glb.print("等于")
+else if a == 123:
+    glb.print("等于123")
+else:
+    glb.print("不等于222")
+end

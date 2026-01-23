@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"slices"
 	"vine-lang/ast"
 	"vine-lang/lexer"
 	"vine-lang/token"
@@ -81,6 +82,29 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 				Source:     source,
 			}
 		}
+	})
+
+	c.RegisterStmtHandler(token.IF, func(p *Parser) any {
+		p.advance() // skip 'if'
+		condition := p.parseExpression()
+		p.expect(token.COLON)
+		var body []ast.Stmt
+		for !p.isEof() && !slices.Contains([]token.TokenType{token.END, token.ELSE}, p.peek().Type) {
+			stmt := p.parseStatement()
+			if stmt != nil {
+				body = append(body, stmt)
+			}
+		}
+		if p.peek().Type == token.ELSE {
+			p.advance() // skip 'else'
+			if p.peek().Type == token.IF {
+				return &ast.IfStmt{Test: condition, Consequent: &ast.BlockStmt{Body: body}, Alternate: p.CallStmtHandler(token.IF)}
+			}
+			return &ast.IfStmt{Test: condition, Consequent: &ast.BlockStmt{Body: body}, Alternate: p.parseBlockStatement()}
+		} else {
+			p.expect(token.END)
+		}
+		return &ast.IfStmt{Test: condition, Consequent: &ast.BlockStmt{Body: body}}
 	})
 
 	c.RegisterStmtHandler(token.FOR, func(p *Parser) any {

@@ -36,7 +36,7 @@ const (
 	NodeAssignmentExpression NodeType = "AssignmentExpression"
 	NodeCompareExpression    NodeType = "CompareExpression"
 	NodeEqualExpression      NodeType = "EqualExpression"
-	NodeTernayExpression     NodeType = "TernayExpression" // 保持原拼写
+	NodeTernayExpression     NodeType = "TernayExpression"
 	NodeRangeExpression      NodeType = "RangeExpression"
 	NodeIterableExpression   NodeType = "IterableExpression"
 	NodeToExpression         NodeType = "ToExpression"
@@ -50,10 +50,10 @@ const (
 	NodeExpressionStatement NodeType = "ExpressionStatement"
 	NodeIfStatement         NodeType = "IfStatement"
 	NodeForStatement        NodeType = "ForStatement"
-	NodeSwitchStmtement     NodeType = "SwitchStmtement" // 保持原拼写
+	NodeSwitchStmtement     NodeType = "SwitchStmtement"
 	NodeCaseBlockStatement  NodeType = "CaseBlockStatement"
 	NodeDefaultCaseBlock    NodeType = "DefaultCaseBlockStatement"
-	NodeExposeStmtement     NodeType = "ExposeStmtement" // 保持原拼写
+	NodeExposeStmtement     NodeType = "ExposeStmtement"
 )
 
 // ================================== Base Interfaces & Structs ==================================
@@ -116,6 +116,10 @@ type Property struct {
 	BaseNode
 	Key   *Literal
 	Value Expr
+}
+
+func (p *Property) String() string {
+	return fmt.Sprintf("%s: %s", p.Key.String(), p.Value.String())
 }
 
 type TemplateElement struct {
@@ -362,6 +366,14 @@ type BlockStmt struct {
 	Body []Stmt
 }
 
+func (b *BlockStmt) String() string {
+	var body = make([]string, len(b.Body))
+	for i, stmt := range b.Body {
+		body[i] = stmt.String()
+	}
+	return fmt.Sprintf("BlockStmt(%s)", strings.Join(body, ", "))
+}
+
 // CaseBlockStmt
 type CaseBlockStmt struct {
 	BaseNode
@@ -402,7 +414,11 @@ type IfStmt struct {
 	BaseNode
 	Test       Expr
 	Consequent *BlockStmt
-	Alternate  *BlockStmt // 可选
+	Alternate  Stmt // 可选
+}
+
+func (ifs *IfStmt) String() string {
+	return fmt.Sprintf("IfStmt(%s, %s, %s)", ifs.Test.String(), ifs.Consequent.String(), ifs.Alternate.String())
 }
 
 // ForStmt
@@ -413,6 +429,10 @@ type ForStmt struct {
 	Update Expr
 	Range  any // 可选
 	Body   *BlockStmt
+}
+
+func (ifs *ForStmt) String() string {
+	return fmt.Sprintf("ForStmt(%s, %s, %s, %s, %s)", ifs.Init.String(), ifs.Value.String(), ifs.Update.String(), ifs.Range, ifs.Body.String())
 }
 
 // SwitchStmt

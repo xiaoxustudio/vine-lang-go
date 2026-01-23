@@ -1,0 +1,17 @@
+use glb
+use time
+
+let nowTime = time.Milli()
+for let i = 0; i < 1000000 ; i++ :
+    let a = 123
+    let b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+    b = a + a * a
+end
+glb.print("耗时：",time.Milli() - nowTime,"ms")

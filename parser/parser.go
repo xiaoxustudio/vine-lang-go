@@ -45,6 +45,15 @@ func (p *Parser) RegisterStmtHandler(kw token.TokenType, fn func(p *Parser) any)
 	p.handlers[kw] = append(p.handlers[kw], fn)
 }
 
+func (p *Parser) CallStmtHandler(tk token.TokenType) ast.Stmt {
+	if handlers, ok := p.handlers[tk]; ok {
+		for _, handler := range handlers {
+			return handler(p).(ast.Stmt)
+		}
+	}
+	return nil
+}
+
 func (p *Parser) GetErrors() []verror.ParseVError {
 	return p.errors
 }
@@ -107,8 +116,9 @@ func (p *Parser) expect(types ...token.TokenType) Token {
 		current := p.peekIndex(i)
 		if slices.Contains(types, current.Type) {
 			return p.advanceIndex(i)
+		} else {
+			i++
 		}
-		i++
 	}
 
 	current := p.peek()
