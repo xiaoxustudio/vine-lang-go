@@ -109,7 +109,7 @@ type Literal struct {
 }
 
 func (l *Literal) String() string {
-	return l.Value.String()
+	return fmt.Sprintf("Literal(%s)", l.Value.String())
 }
 
 type Property struct {
@@ -171,7 +171,7 @@ type FunctionDecl struct {
 	BaseNode
 	PreID     Token // 对应 preId: Token
 	ID        *Literal
-	Arguments []Expr
+	Arguments *ArgsExpr
 	Body      *BlockStmt
 }
 

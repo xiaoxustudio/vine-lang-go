@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"unicode"
 	"vine-lang/token"
-	"vine-lang/types"
 )
 
 func IsIdentifier(ch rune) bool {
@@ -81,11 +80,19 @@ func TrasformPrintStringWithColor(args ...any) string {
 			return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
 		case token.Token:
 			switch current.Type {
-			case token.INT, token.FLOAT:
-				val, _, err := GetNumberAndType(current)
-				if err == nil {
-					return TrasformPrintStringWithColor(val)
+			case token.INT:
+				i, err := current.GetInt()
+				if err != nil {
+					return fmt.Sprintf("%s%s%s", Color.Red, "error", "\033[0m")
 				}
+				return fmt.Sprintf("%s%d%s", Color.Blue, i, "\033[0m")
+			case token.FLOAT:
+				f, err := current.GetFloat()
+				if err != nil {
+					return fmt.Sprintf("%s%s%s", Color.Red, "error", "\033[0m")
+				}
+				return fmt.Sprintf("%s%g%s", Color.Green, f, "\033[0m")
+			case token.STRING:
 			case token.NIL:
 				return fmt.Sprintf("%s%s%s", Color.Cyan, "nil", "\033[0m")
 			case token.TRUE, token.FALSE:
@@ -114,39 +121,6 @@ func TrasformPrintStringWithColor(args ...any) string {
 		}
 	}
 	return s
-}
-
-/* 获取数字和类型 */
-func GetNumberAndType(v any) (any, types.GetNumberAndTypeENUM, error) {
-	switch val := v.(type) {
-	case token.Token:
-		switch val.Type {
-		case token.INT:
-			i, err := val.GetInt()
-			if err != nil {
-				return 0, types.GNT_INT, err
-			}
-			return i, types.GNT_INT, nil
-		case token.FLOAT:
-			f, err := val.GetFloat()
-			if err != nil {
-				return 0, types.GNT_FLOAT, err
-			}
-			return f, types.GNT_FLOAT, nil
-		case token.STRING:
-			return val.Value, types.GNT_STRING, nil
-		default:
-			return val.Value, types.GNT_Unknown, fmt.Errorf("runtime error: unknown operand type %T", v)
-		}
-	case int64:
-		return val, types.GNT_INT, nil
-	case float64:
-		return val, types.GNT_FLOAT, nil
-	case int:
-		return int64(val), types.GNT_INT, nil
-	default:
-		return -1, types.GNT_Unknown, fmt.Errorf("runtime error: unknown operand type %T", v)
-	}
 }
 
 func BinaryVal(leftVal any, op token.TokenType, rightVal any) (any, error) {

@@ -20,12 +20,3 @@ func (k LibsKeywords) IsValidLibsKeyword() bool {
 		return false
 	}
 }
-
-type GetNumberAndTypeENUM int
-
-const (
-	GNT_Unknown GetNumberAndTypeENUM = iota
-	GNT_INT
-	GNT_FLOAT
-	GNT_STRING
-)

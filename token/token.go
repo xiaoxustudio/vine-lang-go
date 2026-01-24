@@ -62,7 +62,7 @@ const (
 	RBRACE TokenType = "}"
 
 	// Keywords
-	FUNCTION TokenType = "FUNCTION"
+	FN       TokenType = "FN"
 	END      TokenType = "END"
 	LET      TokenType = "LET"
 	CST      TokenType = "CST" // const keywords
@@ -89,7 +89,7 @@ const (
 )
 
 var Keywords = map[string]TokenType{
-	"fn":       FUNCTION,
+	"fn":       FN,
 	"let":      LET,
 	"cst":      CST,
 	"if":       IF,
