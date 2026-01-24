@@ -8,8 +8,12 @@ import (
 	"vine-lang/token"
 )
 
+func isChinese(ch rune) bool {
+	return unicode.Is(unicode.Han, ch)
+}
+
 func IsIdentifier(ch rune) bool {
-	return unicode.IsLetter(ch) || ch == '_'
+	return unicode.IsLetter(ch) || ch == '_' || isChinese(ch) || IsDigit(ch)
 }
 
 func IsDigit(ch rune) bool {

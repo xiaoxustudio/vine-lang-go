@@ -225,7 +225,18 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		tok.Line = l.line
 		tok.Type = token.STRING
 	default:
-		if utils.IsIdentifier(l.ch) {
+		if utils.IsDigit(l.ch) {
+			var isFloat bool
+			tok.Value, isFloat = l.readNumber()
+			if isFloat {
+				tok.Type = token.FLOAT
+			} else {
+				tok.Type = token.INT
+			}
+			tok.Column = l.column
+			tok.Line = l.line
+			return tok, nil
+		} else if utils.IsIdentifier(l.ch) {
 			tok.Value = l.readIdentifier()
 			switch tok.Value {
 			case "true":
@@ -234,17 +245,6 @@ func (l *Lexer) GetToken() (token.Token, error) {
 				tok.Type = token.FALSE
 			}
 			tok.Type = token.LookupIdent(tok.Value)
-			tok.Column = l.column
-			tok.Line = l.line
-			return tok, nil
-		} else if utils.IsDigit(l.ch) {
-			var isFloat bool
-			tok.Value, isFloat = l.readNumber()
-			if isFloat {
-				tok.Type = token.FLOAT
-			} else {
-				tok.Type = token.INT
-			}
 			tok.Column = l.column
 			tok.Line = l.line
 			return tok, nil
