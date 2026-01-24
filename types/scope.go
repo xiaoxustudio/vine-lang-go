@@ -10,6 +10,7 @@ type Scope interface {
 	Set(t token.Token, val any)
 	Print()
 	ForEach(fn func(tk token.Token, val any))
+	Define(t token.Token, val any)
 }
 
 type StoreObject struct {

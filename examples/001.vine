@@ -1,24 +1,25 @@
 use glb
-use time
 
+let b = 123123
 
-let a = 123
-
-if a == 1 :
-    glb.print("等于")
+fn a_fn():
+    glb.print("内部正在计算值")
+    let insideVariable = 1
+    # ++insideVariable
+    insideVariable++
+    ++b
 end
 
 
-if a == 222 :
-    glb.print("等于")
-else:
-    glb.print("不等于222")
+let res = a_fn()
+glb.print(res)
+
+
+fn b_fn(val):
+    glb.print("你给我的值为："+val)
+    val
 end
 
-if a == 222 :
-    glb.print("等于")
-else if a == 123:
-    glb.print("等于123")
-else:
-    glb.print("不等于222")
-end
+let res2 = b_fn("哈哈哈哈")
+# let res3 = b_fn() # 报错
+glb.print(res2)

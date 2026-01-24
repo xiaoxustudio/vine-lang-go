@@ -96,7 +96,7 @@ func (e *Environment) Print() {
 	}
 }
 
-/* Function */
+/* 根据Token执行方法 */
 func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 	funcVal, ok := e.Get(name)
 	if ok && funcVal != nil {
@@ -139,6 +139,7 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 	}
 }
 
+/* 根据传入的方法object执行 */
 func (e *Environment) CallFuncObject(fnObject any, args []any) (any, error) {
 	fnObj := reflect.ValueOf(fnObject)
 	if fnObj.Kind() == reflect.Func {

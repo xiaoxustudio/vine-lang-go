@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"vine-lang/ast"
-	"vine-lang/env"
 	environment "vine-lang/env"
 	"vine-lang/object/store"
 	"vine-lang/parser"
@@ -17,10 +16,10 @@ import (
 type Interpreter struct {
 	errors []verror.InterpreterVError
 	p      *parser.Parser
-	env    *env.Environment
+	env    *environment.Environment
 }
 
-func New(p *parser.Parser, env *env.Environment) *Interpreter {
+func New(p *parser.Parser, env *environment.Environment) *Interpreter {
 	return &Interpreter{
 		errors: make([]verror.InterpreterVError, 0),
 		p:      p,
@@ -35,7 +34,7 @@ func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVE
 	})
 }
 
-func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
+func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, error) {
 	if node == nil || env == nil {
 		return nil, nil
 	}
@@ -133,7 +132,16 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 		}
 
 		return i.Eval(n.Consequent, env)
-	case *ast.ReturnStmt:
+	case *ast.FunctionDecl:
+		env.Define(*n.ID.Value, &types.FunctionLikeValNode{
+			IsLamda:  false,
+			IsModule: false,
+			IsInside: false,
+			Token:    n.ID.Value,
+			Args:     n.Arguments,
+			Body:     n.Body,
+		})
+		return nil, nil
 	case *ast.AssignmentExpr:
 		var err error
 		operand, ok := n.Left.(*ast.Literal)
@@ -212,10 +220,18 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 
 		return nil, i.Errorf(p, fmt.Sprintf("property %s not found", p.Value))
 	case *ast.ArgsExpr:
+		for index, arg := range n.Arguments {
+			v, err := i.Eval(arg, env)
+			if err != nil {
+				return nil, err
+			}
+			n.Arguments[index] = v.(ast.Expr)
+		}
 		return n, nil
 	case *ast.CallExpr:
 		{
 			function, _ := i.Eval(n.Callee, env)
+
 			args := make([]any, len(n.Args.Arguments))
 
 			for ind, arg := range n.Args.Arguments {
@@ -227,6 +243,26 @@ func (i *Interpreter) Eval(node ast.Node, env *env.Environment) (any, error) {
 				return v, e
 			} else if reflect.ValueOf(function).Kind() == reflect.Func {
 				return env.CallFuncObject(function, args)
+			} else if fn, ok := function.(*types.FunctionLikeValNode); ok {
+				newEnv := environment.New(env.FileName)
+				newEnv.Link(env)
+
+				for index, arg := range fn.Args.Arguments {
+					name, ok := arg.(*ast.Literal)
+					if !ok {
+						return nil, i.Errorf(token.Token{}, "Not a valid variable to bind")
+					}
+					if len(args) <= index {
+						return nil, i.Errorf(token.Token{}, "Not enough arguments")
+					}
+					env.Define(*name.Value, args[index])
+				}
+
+				res, err := i.Eval(fn.Body, newEnv)
+				if err != nil {
+					return nil, err
+				}
+				return res, nil
 			} else {
 				return nil, i.Errorf(token.Token{}, "Not a function")
 			}
