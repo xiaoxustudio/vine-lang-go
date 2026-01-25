@@ -44,14 +44,18 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		var lastResult any
 		var err error
 		for _, s := range n.Body {
-			lastResult, err = i.Eval(s, env)
+			if _, ok := s.(*ast.CommentStmt); !ok {
+				lastResult, err = i.Eval(s, env)
+			}
 		}
 		return lastResult, err
 	case *ast.BlockStmt:
 		var lastResult any
 		var err error
 		for _, s := range n.Body {
-			lastResult, err = i.Eval(s, env)
+			if _, ok := s.(*ast.CommentStmt); !ok {
+				lastResult, err = i.Eval(s, env)
+			}
 		}
 		return lastResult, err
 	case *ast.UseDecl:
@@ -375,8 +379,6 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			i.Errorf(*n.Value, fmt.Sprintf("Unknown identifier: %s", n.Value.Value))
 		}
 		i.Errorf(*n.Value, fmt.Sprintf("Unknown literal type: %s", n.Value.Type))
-	case *ast.CommentStmt:
-		return nil, nil
 	}
 	return nil, i.Errorf(token.Token{}, fmt.Sprintf("Unknown AST node type: %T", node))
 }
