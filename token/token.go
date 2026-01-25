@@ -102,6 +102,7 @@ var Keywords = map[string]TokenType{
 	"continue": CONTINUE,
 	"use":      USE,
 	"as":       AS,
+	"pick":     PICK,
 	"task":     task,
 	"expose":   EXPOSE,
 	"typeof":   TYPEOF,

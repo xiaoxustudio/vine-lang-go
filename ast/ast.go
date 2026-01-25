@@ -149,21 +149,16 @@ type UseSpecifier struct {
 	Local  *Literal
 }
 
-// UseDefaultSpecifier
-type UseDefaultSpecifier struct {
-	BaseNode
-	Local *Literal
-}
-
 // UseDecl
 type UseDecl struct {
 	BaseNode
 	Source     *Literal
 	Specifiers []Specifier
+	Mode       token.TokenType
 }
 
 func (u *UseDecl) String() string {
-	return fmt.Sprintf("UseDecl(%s, %s)", u.Source.String(), u.Specifiers)
+	return fmt.Sprintf("UseDecl(%s, %s, %s)", u.Source.String(), u.Specifiers, u.Mode)
 }
 
 // FunctionDecl

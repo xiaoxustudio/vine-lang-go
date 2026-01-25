@@ -59,19 +59,74 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		}
 		return lastResult, err
 	case *ast.UseDecl:
-		source, err := i.Eval(n.Source, env)
-		if err != nil {
-			return nil, err
-		}
-		s, ok := source.(token.Token)
-		if !ok {
+		var s token.Token
+		if n.Source != nil && n.Source.Value != nil && (n.Source.Value.Type == token.IDENT || n.Source.Value.Type == token.STRING) {
+			s = *n.Source.Value
+		} else {
 			return nil, i.Errorf(token.Token{}, "Invalid module name")
 		}
 		env.ImportModule(s.Value)
-		for _, s := range n.Specifiers {
-			i.Eval(s, env)
+		if n.Mode == token.AS {
+			if len(n.Specifiers) != 1 {
+				return nil, i.Errorf(token.Token{}, "use as requires exactly one alias")
+			}
+			if aliasLit, ok := n.Specifiers[0].(*ast.Literal); ok {
+				if aliasLit.Value.Type != token.IDENT {
+					return nil, i.Errorf(*aliasLit.Value, "alias must be an identifier")
+				}
+				if mod, exists := env.Get(token.Token{Type: token.IDENT, Value: s.Value}); exists {
+					env.Define(*aliasLit.Value, mod)
+				} else {
+					return nil, i.Errorf(token.Token{Type: token.IDENT, Value: s.Value}, "module not found after import")
+				}
+			} else {
+				return nil, i.Errorf(token.Token{}, "invalid alias specifier")
+			}
+		} else if n.Mode == token.PICK {
+			modAny, exists := env.Get(token.Token{Type: token.IDENT, Value: s.Value})
+			if !exists {
+				return nil, i.Errorf(token.Token{Type: token.IDENT, Value: s.Value}, "module not found after import")
+			}
+			if mod, ok := modAny.(types.LibsModule); ok {
+				for _, sp := range n.Specifiers {
+					if lit, ok := sp.(*ast.Literal); ok {
+						if lit.Value.Type != token.IDENT {
+							return nil, i.Errorf(*lit.Value, "pick target must be an identifier")
+						}
+						if fn, ok := mod.Get(*lit.Value); ok {
+							env.Define(*lit.Value, fn)
+						} else {
+							return nil, i.Errorf(*lit.Value, fmt.Sprintf("function %s not found in module %s", lit.Value.Value, s.Value))
+						}
+						continue
+					}
+					if us, ok := sp.(*ast.UseSpecifier); ok {
+						if us.Remote == nil || us.Remote.Value == nil || us.Remote.Value.Type != token.IDENT {
+							return nil, i.Errorf(token.Token{}, "invalid pick specifier")
+						}
+						var local token.Token
+						if us.Local != nil && us.Local.Value != nil {
+							if us.Local.Value.Type != token.IDENT {
+								return nil, i.Errorf(*us.Local.Value, "alias must be an identifier")
+							}
+							local = *us.Local.Value
+						} else {
+							local = *us.Remote.Value
+						}
+						if fn, ok := mod.Get(*us.Remote.Value); ok {
+							env.Define(local, fn)
+						} else {
+							return nil, i.Errorf(*us.Remote.Value, fmt.Sprintf("function %s not found in module %s", us.Remote.Value.Value, s.Value))
+						}
+						continue
+					}
+					return nil, i.Errorf(token.Token{}, "invalid pick specifier")
+				}
+			} else {
+				return nil, i.Errorf(token.Token{}, "invalid module type for pick")
+			}
 		}
-		return source, err
+		return s, nil
 	case *ast.ExpressionStmt:
 		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:

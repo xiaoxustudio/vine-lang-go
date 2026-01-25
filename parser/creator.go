@@ -52,34 +52,67 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			return &ast.UseDecl{
 				Specifiers: specifiers,
 				Source:     source,
+				Mode:       token.AS,
 			}
 		} else if p.peek().Type == token.PICK {
 			p.advance() // skip 'pick'
 			if p.peek().Type == token.LPAREN {
+				p.advance() // skip '('
 				for p.peek().Type != token.RPAREN {
-					if p.peek().Type == token.COMMA {
-						p.advance() // skip ','
+					remoteExpr := p.parsePrimaryExpression()
+					if lit, ok := remoteExpr.(*ast.Literal); ok {
+						var aliasLit *ast.Literal
+						if p.peek().Type == token.AS {
+							p.advance()
+							aliasExpr := p.parsePrimaryExpression()
+							if al, ok := aliasExpr.(*ast.Literal); ok {
+								aliasLit = al
+							} else {
+								panic(fmt.Sprintf("expected alias literal, got %s", aliasExpr.String()))
+							}
+						}
+						specifiers = append(specifiers, &ast.UseSpecifier{Remote: lit, Local: aliasLit})
+					} else {
+						panic(fmt.Sprintf("expected literal, got %s", remoteExpr.String()))
 					}
-					alias := p.parsePrimaryExpression()
-					specifiers = append(specifiers, alias)
+					if p.peek().Type == token.COMMA {
+						p.advance()
+					}
 				}
 				p.expect(token.RPAREN)
 				return &ast.UseDecl{
 					Specifiers: specifiers,
 					Source:     source,
+					Mode:       token.PICK,
 				}
 			} else {
-				alias := p.parsePrimaryExpression()
-				specifiers = append(specifiers, alias)
+				remoteExpr := p.parsePrimaryExpression()
+				if lit, ok := remoteExpr.(*ast.Literal); ok {
+					var aliasLit *ast.Literal
+					if p.peek().Type == token.AS {
+						p.advance()
+						aliasExpr := p.parsePrimaryExpression()
+						if al, ok := aliasExpr.(*ast.Literal); ok {
+							aliasLit = al
+						} else {
+							panic(fmt.Sprintf("expected alias literal, got %s", aliasExpr.String()))
+						}
+					}
+					specifiers = append(specifiers, &ast.UseSpecifier{Remote: lit, Local: aliasLit})
+				} else {
+					panic(fmt.Sprintf("expected literal, got %s", remoteExpr.String()))
+				}
 				return &ast.UseDecl{
 					Specifiers: specifiers,
 					Source:     source,
+					Mode:       token.PICK,
 				}
 			}
 		} else {
 			return &ast.UseDecl{
 				Specifiers: specifiers,
 				Source:     source,
+				Mode:       token.USE,
 			}
 		}
 	})

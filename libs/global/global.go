@@ -17,6 +17,7 @@ func NewModule() types.LibsModule {
 		},
 	}
 	g.LibsModuleObject.Register("print", Print)
+	g.LibsModuleObject.Register("id", Id)
 	return g
 }
 
@@ -29,13 +30,20 @@ func (g *GlobalModule) Name() string {
 }
 
 /* FN */
+
+// 打印
 func Print(env any, rangeArgs ...any) {
 	if len(rangeArgs) == 0 {
 		return
 	}
 
 	for _, arg := range rangeArgs {
-		fmt.Print(utils.TrasformPrintStringWithColor(arg))
+		fmt.Print(utils.TrasformPrintStringWithColor(arg), " ")
 	}
 	fmt.Println()
+}
+
+// 获取对象内存地址
+func Id(env any, val any) any {
+	return fmt.Sprintf("%p", &val)
 }

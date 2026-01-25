@@ -1,25 +1,9 @@
-use glb
+use glb as tglb
+use glb pick (print as p,id as _id)
+use glb pick print
 
-let b = 123123
+tglb.print("alias ok")
+print("pick ok", 123)
 
-fn a_fn():
-    glb.print("内部正在计算值")
-    let insideVariable = 1
-    # ++insideVariable
-    insideVariable++
-    ++b
-end
+p("pick alias ok", _id(123))
 
-
-let res = a_fn()
-glb.print(res)
-
-
-fn b_fn(val):
-    glb.print("你给我的值为："+val)
-    val # 返回值
-end
-
-let res2 = b_fn("哈哈哈哈")
-# let res3 = b_fn() # 报错
-glb.print(res2)

@@ -1,13 +1,7 @@
-use glb
-use time
+use glb as tglb
+use glb pick print as p
+use glb pick print
 
-let a = GLOBAL.Test
-
-let now = time.Now()
-
-glb.print(now)
-
-let b = now + 1
-
-glb.print(b)
-glb.print(a)
+tglb.print("alias ok")
+print("pick ok", b)
+p("pick alias ok", b)

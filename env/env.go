@@ -171,11 +171,14 @@ func (e *Environment) CallFuncObject(fnObject any, args []any) (any, error) {
 }
 
 func (e *Environment) ImportModule(name string) {
+	tk := Token{Type: token.IDENT, Value: name}
+	if existed, ok := e.Get(tk); ok {
+		if _, isMod := existed.(types.LibsModule); isMod {
+			return
+		}
+	}
 	if v, ok := libs.LibsMap[types.LibsKeywords(name)]; ok {
-		v.ForEach(func(tk token.Token, val any) {
-			e.Define(tk, val)
-		})
-		e.Define(Token{Type: token.IDENT, Value: name}, v)
+		e.Define(tk, v)
 	} else {
 		panic(verror.InterpreterVError{
 			Position: Token{}.ToPosition(e.FileName),
