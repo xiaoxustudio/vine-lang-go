@@ -7,6 +7,7 @@ var envPool = sync.Pool{
 		return &Environment{
 			store:   make(map[Token]any, 8),
 			nameMap: make(map[string]Token, 8),
+			typeMap: make(map[string]string, 8),
 		}
 	},
 }
@@ -20,6 +21,9 @@ func NewPooled(fileName string) *Environment {
 	}
 	for k := range e.nameMap {
 		delete(e.nameMap, k)
+	}
+	for k := range e.typeMap {
+		delete(e.typeMap, k)
 	}
 	return e
 }

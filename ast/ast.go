@@ -180,9 +180,10 @@ type LambdaFunctionDecl struct {
 // VariableDecl
 type VariableDecl struct {
 	BaseNode
-	Name    *Literal
-	Value   Expr
-	IsConst bool
+	Name     *Literal
+	TypeName *Literal
+	Value    Expr
+	IsConst  bool
 }
 
 func (v *VariableDecl) String() string {
@@ -191,6 +192,9 @@ func (v *VariableDecl) String() string {
 		prefix = "const"
 	} else {
 		prefix = "let"
+	}
+	if v.TypeName != nil {
+		return fmt.Sprintf("%s %s %s = %s", prefix, v.Name.String(), v.TypeName.String(), v.Value)
 	}
 	return fmt.Sprintf("%s %s = %s", prefix, v.Name.String(), v.Value)
 }

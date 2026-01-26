@@ -14,16 +14,18 @@ import (
 )
 
 type Interpreter struct {
-	errors []verror.InterpreterVError
-	p      *parser.Parser
-	env    *environment.Environment
+	errors  []verror.InterpreterVError
+	p       *parser.Parser
+	env     *environment.Environment
+	checker *types.Checker
 }
 
 func New(p *parser.Parser, env *environment.Environment) *Interpreter {
 	return &Interpreter{
-		errors: make([]verror.InterpreterVError, 0),
-		p:      p,
-		env:    env,
+		errors:  make([]verror.InterpreterVError, 0),
+		p:       p,
+		env:     env,
+		checker: types.NewChecker(),
 	}
 }
 
@@ -131,8 +133,26 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:
 		val, err := i.Eval(n.Value, env)
+		if err != nil {
+			return nil, err
+		}
+		if n.TypeName != nil && n.TypeName.Value != nil {
+			typeName := i.checker.NormalizeTypeName(n.TypeName.Value.Value)
+			if !i.checker.IsKnownTypeName(typeName) {
+				return nil, i.Errorf(*n.TypeName.Value, fmt.Sprintf("unknown type: %s", n.TypeName.Value.Value))
+			}
+			resolveIdent := func(tk token.Token) (any, bool) {
+				return env.Get(tk)
+			}
+			if !i.checker.MatchType(typeName, val, resolveIdent) {
+				actualType := i.checker.RuntimeTypeName(val, resolveIdent)
+				return nil, i.Errorf(*n.TypeName.Value, fmt.Sprintf("type mismatch: expected %s, got %s", typeName, actualType))
+			}
+			env.DefineType(*n.Name.Value, typeName)
+		}
+
 		env.Define(*n.Name.Value, val)
-		return val, err
+		return val, nil
 	case *ast.ForStmt:
 		if n.Range != nil {
 			return nil, nil
@@ -211,8 +231,20 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			return nil, i.Errorf(*operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
 		}
 		val, err := i.Eval(n.Right, env)
+		if err != nil {
+			return nil, err
+		}
+		if typeName, ok := env.GetType(*operand.Value); ok {
+			resolveIdent := func(tk token.Token) (any, bool) {
+				return env.Get(tk)
+			}
+			if !i.checker.MatchType(typeName, val, resolveIdent) {
+				actualType := i.checker.RuntimeTypeName(val, resolveIdent)
+				return nil, i.Errorf(*operand.Value, fmt.Sprintf("type mismatch: expected %s, got %s", typeName, actualType))
+			}
+		}
 		env.Set(*operand.Value, val)
-		return nil, err
+		return nil, nil
 	case *ast.CompareExpr:
 		leftRaw, err := i.Eval(n.Left, env)
 		if err != nil {

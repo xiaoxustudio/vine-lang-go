@@ -19,6 +19,7 @@ type Environment struct {
 	parent   *Environment
 	store    map[Token]any
 	nameMap  map[string]Token
+	typeMap  map[string]string
 	FileName string
 }
 
@@ -27,6 +28,7 @@ func New(fileName string) *Environment {
 		parent:   nil,
 		store:    make(map[Token]any),
 		nameMap:  make(map[string]Token), // for faster lookup
+		typeMap:  make(map[string]string),
 		FileName: fileName,
 	}
 
@@ -60,6 +62,20 @@ func (e *Environment) Lookup(name Token) (Environment, Token) {
 	return Environment{}, Token{}
 }
 
+func (e *Environment) GetType(name Token) (string, bool) {
+	if tp, exists := e.typeMap[name.Value]; exists {
+		return tp, true
+	}
+	if e.parent != nil {
+		return e.parent.GetType(name)
+	}
+	return "", false
+}
+
+func (e *Environment) DefineType(name Token, typeName string) {
+	e.typeMap[name.Value] = typeName
+}
+
 func (e *Environment) Set(name Token, val any) {
 	theEnv, tk := e.Lookup(name)
 	if !tk.IsEmpty() {
@@ -88,6 +104,7 @@ func (e *Environment) Define(name Token, val any) {
 func (e *Environment) Delete(name Token) {
 	delete(e.store, name)
 	delete(e.nameMap, name.Value)
+	delete(e.typeMap, name.Value)
 }
 
 func (e *Environment) Print() {

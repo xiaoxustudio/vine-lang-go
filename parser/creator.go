@@ -23,15 +23,23 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 
 		idTk := p.expect(token.IDENT)
 
-		id := &ast.Literal{Value: &idTk}
-		p.expect(token.ASSIGN)
-
-		value := p.parseExpression()
+		id := p.createLiteral(idTk)
+		var typeName *ast.Literal
+		if p.peek().Type == token.IDENT && p.peek().Line == idTk.Line {
+			typeTk := p.advance()
+			typeName = &ast.Literal{Value: &typeTk}
+		}
+		var value ast.Expr = nil
+		if p.peek().Type == token.ASSIGN {
+			p.expect(token.ASSIGN)
+			value = p.parseExpression()
+		}
 
 		return &ast.VariableDecl{
-			Name:    id,
-			Value:   value,
-			IsConst: isConst,
+			Name:     id,
+			TypeName: typeName,
+			Value:    value,
+			IsConst:  isConst,
 		}
 	})
 
