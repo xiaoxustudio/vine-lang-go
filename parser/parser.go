@@ -291,6 +291,32 @@ func (p *Parser) parseCallExpression() ast.Expr {
 	return left
 }
 
+func (p *Parser) parsePropertyExpression() []*ast.Property {
+	var properties = []*ast.Property{}
+	if p.isEof() {
+		return properties
+	}
+	var index = 0
+	for p.peek().Type != token.RBRACKET {
+		if p.peek().Type == token.COMMA {
+			p.advance()
+		}
+		args := p.parseExpression()
+		index++
+		properties = append(properties, &ast.Property{Key: p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), Value: args})
+	}
+	return properties
+}
+
+func (p *Parser) parseArrayExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	args := p.parsePropertyExpression()
+	arr := &ast.ArrayExpr{Items: args}
+	return arr
+}
+
 func (p *Parser) parseMemberExpression() ast.Expr {
 	if p.isEof() {
 		return nil
@@ -327,6 +353,11 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 		p.advance()
 		expr := p.parseExpression()
 		p.expect(token.RPAREN)
+		return expr
+	case token.LBRACKET:
+		p.advance()
+		expr := p.parseArrayExpression()
+		p.expect(token.RBRACKET)
 		return expr
 	case token.NEWLINE, token.WHITESPACE, token.COMMENT:
 		p.advance()

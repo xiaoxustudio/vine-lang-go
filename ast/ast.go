@@ -295,6 +295,14 @@ type ArrayExpr struct {
 	Items []*Property
 }
 
+func (arr *ArrayExpr) String() string {
+	var items = make([]string, len(arr.Items))
+	for i, v := range arr.Items {
+		items[i] = v.String()
+	}
+	return fmt.Sprintf("ArrayExpr(%s)", strings.Join(items, ", "))
+}
+
 // MemberExpr
 type MemberExpr struct {
 	BaseNode
@@ -422,7 +430,7 @@ type ForStmt struct {
 	Init   Expr
 	Value  Expr
 	Update Expr
-	Range  any // 可选
+	Range  Expr
 	Body   *BlockStmt
 }
 

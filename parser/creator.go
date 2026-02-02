@@ -142,14 +142,24 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 
 	c.RegisterStmtHandler(token.FOR, func(p *Parser) any {
 		p.advance() // skip 'for'
-		firstExpr := p.parseStatement()
+		var firstExpr ast.Expr
+
+		if p.peek().Type == token.LET {
+			firstExpr = p.parseStatement()
+		} else {
+			firstExpr = p.parseExpression()
+		}
+
 		var body *ast.BlockStmt
-		// for i := range xxx
-		if p.peek().Type == token.COLON {
+		// for i in xxx
+		if p.peek().Type == token.IN {
+			p.advance() // skip 'in'
+			iter := p.parseExpression()
 			body = p.parseBlockStatement()
 			return &ast.ForStmt{
 				Body:  body,
-				Range: firstExpr,
+				Init:  firstExpr,
+				Range: iter,
 			}
 		}
 		// for i := 0; i < 10; i++ :

@@ -56,10 +56,12 @@ const (
 	COLON     TokenType = ":"
 	QUESTION  TokenType = "?"
 
-	LPAREN TokenType = "("
-	RPAREN TokenType = ")"
-	LBRACE TokenType = "{"
-	RBRACE TokenType = "}"
+	LPAREN   TokenType = "("
+	RPAREN   TokenType = ")"
+	LBRACE   TokenType = "{"
+	RBRACE   TokenType = "}"
+	LBRACKET TokenType = "["
+	RBRACKET TokenType = "]"
 
 	// Keywords
 	FN       TokenType = "FN"

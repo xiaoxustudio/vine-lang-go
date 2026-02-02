@@ -134,12 +134,39 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		env.Define(*n.Name.Value, val)
 		return val, err
 	case *ast.ForStmt:
-		if n.Range != nil {
-			return nil, nil
-		}
-
 		loopEnv := environment.New(env.FileName)
 		loopEnv.Link(env)
+		if n.Range != nil && n.Init != nil {
+			name, ok := n.Init.(*ast.Literal)
+
+			if !ok {
+				return nil, i.Errorf(token.Token{}, "init must be a literal")
+			}
+
+			value, err := i.Eval(n.Range, loopEnv)
+			if err != nil {
+				return nil, err
+			}
+
+			if reflect.TypeOf(value).Kind() == reflect.Slice || reflect.TypeOf(value).Kind() == reflect.Array {
+				for index := 0; index < reflect.ValueOf(value).Len(); index++ {
+					bodyEnv := environment.NewPooled(env.FileName)
+					bodyEnv.Define(*name.Value, reflect.ValueOf(value).Index(index).Interface())
+					bodyEnv.Link(loopEnv)
+
+					_, err := i.Eval(n.Body, bodyEnv)
+
+					bodyEnv.Release()
+
+					if err != nil {
+						return nil, err
+					}
+
+				}
+			}
+
+			return nil, nil
+		}
 
 		if _, err := i.Eval(n.Init, loopEnv); err != nil {
 			return nil, err
@@ -238,6 +265,18 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
 			return result, err
 		}
+	case *ast.Property:
+		return n, nil
+	case *ast.ArrayExpr:
+		var arr = make([]any, len(n.Items))
+		for index, element := range n.Items {
+			v, err := i.Eval(element.Value, env)
+			if err != nil {
+				return nil, err
+			}
+			arr[index] = v
+		}
+		return arr, nil
 	case *ast.MemberExpr:
 		obj, err := i.Eval(n.Object, env)
 		if obj == nil {

@@ -1,9 +1,9 @@
-use glb as tglb
-use glb pick (print as p,id as _id)
 use glb pick print
 
-tglb.print("alias ok")
-print("pick ok", 123)
+let a = [1 ,"123",3]
+print(a)
 
-p("pick alias ok", _id(123))
+for i in a:
+    print(i)
+end
 

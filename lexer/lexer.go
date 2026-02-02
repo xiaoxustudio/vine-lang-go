@@ -186,6 +186,10 @@ func (l *Lexer) GetToken() (token.Token, error) {
 		tok = token.NewToken(token.LBRACE, l.ch, l.column, l.line)
 	case '}':
 		tok = token.NewToken(token.RBRACE, l.ch, l.column, l.line)
+	case '[':
+		tok = token.NewToken(token.LBRACKET, l.ch, l.column, l.line)
+	case ']':
+		tok = token.NewToken(token.RBRACKET, l.ch, l.column, l.line)
 	case ';':
 		tok = token.NewToken(token.SEMICOLON, l.ch, l.column, l.line)
 	case ' ':
