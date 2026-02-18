@@ -1,0 +1,10 @@
+use glb pick print
+
+let a = [1 ,"123",3]
+print(a)
+
+for i in a:
+    print(i)
+end
+
+

@@ -297,13 +297,20 @@ func (p *Parser) parsePropertyExpression() []*ast.Property {
 		return properties
 	}
 	var index = 0
-	for p.peek().Type != token.RBRACKET {
-		if p.peek().Type == token.COMMA {
+	for p.peek().Type != token.RBRACE && p.peek().Type != token.RBRACKET {
+		key := p.parseExpression()
+		if p.peek().Type == token.COLON {
 			p.advance()
+			value := p.parseExpression()
+			if p.peek().Type == token.COMMA {
+				p.advance()
+			}
+			properties = append(properties, &ast.Property{Key: key.(*ast.Literal), Value: value})
+		} else if p.peek().Type == token.COMMA {
+			p.advance()
+			properties = append(properties, &ast.Property{Key: p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), Value: key})
 		}
-		args := p.parseExpression()
 		index++
-		properties = append(properties, &ast.Property{Key: p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), Value: args})
 	}
 	return properties
 }
@@ -315,6 +322,15 @@ func (p *Parser) parseArrayExpression() ast.Expr {
 	args := p.parsePropertyExpression()
 	arr := &ast.ArrayExpr{Items: args}
 	return arr
+}
+
+func (p *Parser) parseObjectExpression() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	args := p.parsePropertyExpression()
+	obj := &ast.ObjectExpr{Properties: args}
+	return obj
 }
 
 func (p *Parser) parseMemberExpression() ast.Expr {
@@ -358,6 +374,11 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 		p.advance()
 		expr := p.parseArrayExpression()
 		p.expect(token.RBRACKET)
+		return expr
+	case token.LBRACE:
+		p.advance()
+		expr := p.parseObjectExpression()
+		p.expect(token.RBRACE)
 		return expr
 	case token.NEWLINE, token.WHITESPACE, token.COMMENT:
 		p.advance()

@@ -2,6 +2,7 @@ package global
 
 import (
 	"fmt"
+	"vine-lang/object/store"
 	"vine-lang/types"
 	"vine-lang/utils"
 )
@@ -13,7 +14,7 @@ type GlobalModule struct {
 func NewModule() types.LibsModule {
 	g := &GlobalModule{
 		LibsModuleObject: types.LibsModuleObject{
-			Store: *types.NewStoreObject(),
+			Store: *store.NewStoreObject(),
 		},
 	}
 	g.LibsModuleObject.Register("print", Print)
@@ -38,6 +39,10 @@ func Print(env any, rangeArgs ...any) {
 	}
 
 	for _, arg := range rangeArgs {
+		if v, ok := arg.(*store.StoreObject); ok {
+			fmt.Print(store.StoreObjectToReadableJSON(v), " ")
+			continue
+		}
 		fmt.Print(utils.TrasformPrintStringWithColor(arg), " ")
 	}
 	fmt.Println()

@@ -289,6 +289,14 @@ type ObjectExpr struct {
 	Properties []*Property
 }
 
+func (o *ObjectExpr) String() string {
+	var props = make([]string, len(o.Properties))
+	for i, prop := range o.Properties {
+		props[i] = prop.String()
+	}
+	return fmt.Sprintf("ObjectExpr(%s)", strings.Join(props, ", "))
+}
+
 // ArrayExpr
 type ArrayExpr struct {
 	BaseNode

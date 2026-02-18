@@ -1,9 +1,18 @@
 use glb pick print
 
-let a = [1 ,"123",3]
+let a = {
+    "1":1,
+    2:2,
+    a:1,
+    b:3,
+    c:{c:2},
+    d:[1,2,3]
+}
+
 print(a)
 
-for i in a:
-    print(i)
-end
+# for i in a:
+#     print(i)
+# end
+
 

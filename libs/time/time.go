@@ -2,6 +2,7 @@ package time
 
 import (
 	"time"
+	"vine-lang/object/store"
 	"vine-lang/types"
 )
 
@@ -12,7 +13,7 @@ type TimeModule struct {
 func NewModule() types.LibsModule {
 	g := &TimeModule{
 		LibsModuleObject: types.LibsModuleObject{
-			Store: *types.NewStoreObject(),
+			Store: *store.NewStoreObject(),
 		},
 	}
 	g.LibsModuleObject.Register("Now", Now)

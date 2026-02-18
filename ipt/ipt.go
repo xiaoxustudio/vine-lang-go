@@ -3,6 +3,7 @@ package ipt
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"vine-lang/ast"
 	environment "vine-lang/env"
 	"vine-lang/object/store"
@@ -277,6 +278,23 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			arr[index] = v
 		}
 		return arr, nil
+	case *ast.ObjectExpr:
+		obj := store.NewStoreObject()
+		obj.Define(token.Token{Type: token.IDENT, Value: "__proto__"}, store.NewStoreObject())
+		for _, prop := range n.Properties {
+			v, err := i.Eval(prop.Value, env)
+			if err != nil {
+				return nil, err
+			}
+			// 字符串和数字才可以当作key
+			if slices.Contains([]token.TokenType{token.STRING, token.INT, token.FLOAT, token.IDENT}, prop.Key.Value.Type) {
+				obj.Define(*prop.Key.Value, v)
+			} else {
+				return nil, i.Errorf(token.Token{}, "invalid key type")
+			}
+			// obj.Define(prop, v)
+		}
+		return obj, nil
 	case *ast.MemberExpr:
 		obj, err := i.Eval(n.Object, env)
 		if obj == nil {
