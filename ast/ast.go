@@ -320,6 +320,9 @@ type MemberExpr struct {
 }
 
 func (m *MemberExpr) String() string {
+	if m.Computed {
+		return fmt.Sprintf("*MemberExpr(%s.%s)", m.Object.String(), m.Property.String())
+	}
 	return fmt.Sprintf("MemberExpr(%s.%s)", m.Object.String(), m.Property.String())
 }
 

@@ -16,10 +16,11 @@ type Token = token.Token
 
 type Environment struct {
 	types.Scope
-	parent   *Environment
-	store    map[Token]any
-	nameMap  map[string]Token
-	FileName string
+	parent     *Environment
+	store      map[Token]any
+	nameMap    map[string]Token
+	FileName   string
+	MountScope types.Scope // 挂载的Scope，可能是对象什么的
 }
 
 func New(fileName string) *Environment {
@@ -47,6 +48,10 @@ func (e *Environment) Get(name Token) (any, bool) {
 	if e.parent != nil {
 		return e.parent.Get(name)
 	}
+
+	if e.MountScope != nil {
+		return e.MountScope.Get(name)
+	}
 	return nil, false
 }
 
@@ -57,6 +62,7 @@ func (e *Environment) Lookup(name Token) (Environment, Token) {
 	if e.parent != nil {
 		return e.parent.Lookup(name)
 	}
+
 	return Environment{}, Token{}
 }
 
@@ -65,10 +71,14 @@ func (e *Environment) Set(name Token, val any) {
 	if !tk.IsEmpty() {
 		theEnv.store[tk] = val
 	} else {
-		panic(verror.InterpreterVError{
-			Position: name.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
-		})
+		if e.MountScope != nil {
+			e.MountScope.Define(name, val)
+		} else {
+			panic(verror.InterpreterVError{
+				Position: name.ToPosition(e.FileName),
+				Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
+			})
+		}
 	}
 }
 

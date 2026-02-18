@@ -344,6 +344,11 @@ func (p *Parser) parseMemberExpression() ast.Expr {
 		p.advance()
 		right := p.parseMemberExpression()
 		return &ast.MemberExpr{Object: left, Property: right}
+	} else if p.peek().Type == token.LBRACKET {
+		p.advance()
+		right := p.parseMemberExpression()
+		p.expect(token.RBRACKET)
+		return &ast.MemberExpr{Object: left, Property: right, Computed: true}
 	}
 	return left
 }

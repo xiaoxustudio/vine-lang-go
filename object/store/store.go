@@ -3,7 +3,6 @@ package store
 import (
 	"encoding/json"
 	"fmt"
-	"go/types"
 	"strconv"
 	"vine-lang/token"
 	LibsUtils "vine-lang/utils"
@@ -11,7 +10,6 @@ import (
 )
 
 type StoreObject struct {
-	types.Scope
 	parent  *StoreObject
 	store   map[token.Token]any
 	nameMap map[string]token.Token

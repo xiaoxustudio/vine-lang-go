@@ -303,37 +303,85 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			return nil, err
 		}
 
-		var p token.Token
+		var prop any
 		if n.Computed {
-			pVal, err := i.Eval(n.Property, env)
+			val, err := i.Eval(n.Property, env)
 			if err != nil {
 				return nil, err
 			}
-			p = pVal.(token.Token)
-			return nil, i.Errorf(p, "computed property not supported")
-		} else {
-			val, ok := reflect.ValueOf(n.Property).Interface().(*ast.Literal)
-			if !ok {
-				return nil, i.Errorf(token.Token{}, "Invalid property name")
+
+			switch v := val.(type) {
+			case *token.Token:
+				prop = *v
+			case token.Token:
+				prop = v
+			default:
+				prop = v
 			}
-			p = *val.Value
+		} else {
+			if ident, ok := n.Property.(*ast.Literal); ok {
+				prop = *ident.Value
+			} else {
+				if scope, ok := obj.(types.Scope); ok {
+					env.MountScope = scope
+					val, err := i.Eval(n.Property, env)
+					env.MountScope = nil
+					if err != nil {
+						return nil, err
+					}
+					return val, nil
+				} else {
+					return nil, i.Errorf(token.Token{}, "invalid property structure")
+				}
+			}
 		}
 
 		/* 对象 */
 		if m, ok := obj.(*store.StoreObject); ok {
-			if v, ok := m.Get(p); ok {
-				return v, nil
+			if p, ok := prop.(token.Token); ok {
+				if v, ok := m.Get(p); ok {
+					return v, nil
+				}
 			}
 		}
 
 		/* 模块 */
 		if m, ok := obj.(types.LibsModule); ok {
-			if v, ok := m.Get(p); ok {
+			if v, ok := m.Get(prop.(token.Token)); ok {
 				return v, nil
 			}
 		}
 
-		return nil, i.Errorf(p, fmt.Sprintf("property %s not found", p.Value))
+		/* Slice or Array */
+		if m, ok := obj.([]any); ok {
+			switch v := prop.(type) {
+			case int64:
+				if prop.(int64) >= int64(len(m)) {
+					return nil, i.Errorf(token.Token{}, "index out of range")
+				}
+				return m[prop.(int64)], nil
+			case token.Token:
+				if v.Type != token.INT {
+					return nil, i.Errorf(token.Token{}, "index must be an integer")
+				}
+				_i := prop.(token.Token)
+				if _i.Type == token.INT {
+					index, err := _i.GetInt()
+					if err != nil {
+						return nil, i.Errorf(token.Token{}, "index must be an integer")
+					}
+					if index >= int64(len(m)) {
+						return nil, i.Errorf(token.Token{}, "index out of range")
+					}
+					return m[index], nil
+				} else {
+					return nil, i.Errorf(token.Token{}, "index must be an integer")
+				}
+			}
+
+		}
+
+		return nil, i.Errorf(token.Token{}, fmt.Sprintf("property %s not found", prop))
 	case *ast.ArgsExpr:
 		for index, arg := range n.Arguments {
 			v, err := i.Eval(arg, env)

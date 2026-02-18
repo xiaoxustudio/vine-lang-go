@@ -9,8 +9,10 @@ let a = {
     d:[1,2,3]
 }
 
-print(a)
-
+# print(a)
+print(a.d)
+print(a.d.0)
+print(a.d[0], a.d[1], a.d[2])
 # for i in a:
 #     print(i)
 # end
