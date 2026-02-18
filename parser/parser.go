@@ -306,8 +306,10 @@ func (p *Parser) parsePropertyExpression() []*ast.Property {
 				p.advance()
 			}
 			properties = append(properties, &ast.Property{Key: key.(*ast.Literal), Value: value})
-		} else if p.peek().Type == token.COMMA {
-			p.advance()
+		} else {
+			if p.peek().Type == token.COMMA {
+				p.advance()
+			}
 			properties = append(properties, &ast.Property{Key: p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), Value: key})
 		}
 		index++

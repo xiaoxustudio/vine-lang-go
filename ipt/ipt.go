@@ -292,7 +292,6 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			} else {
 				return nil, i.Errorf(token.Token{}, "invalid key type")
 			}
-			// obj.Define(prop, v)
 		}
 		return obj, nil
 	case *ast.MemberExpr:
