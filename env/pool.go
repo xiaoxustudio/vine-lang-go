@@ -7,6 +7,7 @@ var envPool = sync.Pool{
 		return &Environment{
 			store:   make(map[Token]any, 8),
 			nameMap: make(map[string]Token, 8),
+			consts:  make(map[string]struct{}, 8),
 		}
 	},
 }
@@ -15,6 +16,10 @@ func NewPooled(fileName string) *Environment {
 	e := envPool.Get().(*Environment)
 	e.FileName = fileName
 	e.parent = nil
+	e.Exports = nil
+	for k := range e.consts {
+		delete(e.consts, k)
+	}
 	for k := range e.store {
 		delete(e.store, k)
 	}

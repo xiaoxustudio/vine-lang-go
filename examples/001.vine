@@ -1,20 +1,10 @@
 use glb pick print
+use "./module.vine"
+use "./module.vine" pick add
 
-let a = {
-    "1":1,
-    2:2,
-    a:1,
-    b:3,
-    c:{c:2},
-    d:[1,2,3]
-}
+# print(STATE)
+# print(add(2, 1))
 
-# print(a)
-print(a.d)
-print(a.d.0)
-print(a.d[0], a.d[1], a.d[2])
-# for i in a:
-#     print(i)
-# end
-
-
+cst a = 3
+a = 4
+print(a)

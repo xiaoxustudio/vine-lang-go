@@ -22,6 +22,27 @@ type LibsModuleObject struct {
 	Store store.StoreObject
 }
 
+type UserModule struct {
+	LibsModuleObject
+	name string
+}
+
+func NewUserModule(name string, moduleStore *store.StoreObject) *UserModule {
+	if moduleStore == nil {
+		moduleStore = store.NewStoreObject()
+	}
+	return &UserModule{
+		LibsModuleObject: LibsModuleObject{
+			Store: *moduleStore,
+		},
+		name: name,
+	}
+}
+
+func (u *UserModule) Name() string {
+	return u.name
+}
+
 func (l *LibsModuleObject) ID() LibsKeywords {
 	return Unknown
 }

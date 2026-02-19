@@ -18,6 +18,24 @@ const (
 	MULTI_PROMPT = "...   "
 )
 
+func init() {
+	env.SetExecuteCode(executeCodeForModule)
+}
+
+func executeCodeForModule(filename string, code string, wk env.Workspace) (any, error) {
+	lex := lexer.New(filename, code)
+	lex.Parse()
+
+	p := parser.CreateParser(lex)
+
+	e := env.New(wk)
+	e.FileName = filename
+
+	i := ipt.New(p, e)
+
+	return i.EvalSafe()
+}
+
 // REPL 交互式环境结构
 type REPL struct {
 	env       *env.Environment
@@ -29,7 +47,7 @@ type REPL struct {
 // New 创建新的 REPL 实例
 func New() *REPL {
 	return &REPL{
-		env:       env.New("<repl>"),
+		env:       env.New(env.Workspace{FileName: "<repl>"}),
 		scanner:   bufio.NewScanner(os.Stdin),
 		multiLine: false,
 	}
@@ -322,7 +340,7 @@ func (r *REPL) printEnv() {
 
 // reset 重置环境
 func (r *REPL) reset() {
-	r.env = env.New("<repl>")
+	r.env = env.New(r.env.WorkSpace)
 	r.buffer.Reset()
 	r.multiLine = false
 	fmt.Println("environment is reset!")

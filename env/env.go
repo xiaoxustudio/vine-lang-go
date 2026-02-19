@@ -3,6 +3,8 @@ package env
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"vine-lang/libs"
 	"vine-lang/object/store"
@@ -14,27 +16,53 @@ import (
 
 type Token = token.Token
 
+type ExecuteCodeFunc func(filename string, code string, wk Workspace) (any, error)
+
+var executeCode ExecuteCodeFunc
+
+func SetExecuteCode(fn ExecuteCodeFunc) {
+	executeCode = fn
+}
+
+func ExecuteCode(filename string, code string, wk Workspace) (any, error) {
+	if executeCode == nil {
+		return nil, errors.New("execute code handler is not set")
+	}
+	return executeCode(filename, code, wk)
+}
+
 type Environment struct {
 	types.Scope
 	parent     *Environment
 	store      map[Token]any
 	nameMap    map[string]Token
+	consts     map[string]struct{}
 	FileName   string
 	MountScope types.Scope // 挂载的Scope，可能是对象什么的
+	WorkSpace  Workspace
+	Exports    *store.StoreObject
 }
 
-func New(fileName string) *Environment {
+func New(workspace Workspace) *Environment {
 	e := &Environment{
-		parent:   nil,
-		store:    make(map[Token]any),
-		nameMap:  make(map[string]Token), // for faster lookup
-		FileName: fileName,
+		parent:    nil,
+		store:     make(map[Token]any),
+		nameMap:   make(map[string]Token), // for faster lookup
+		consts:    make(map[string]struct{}),
+		WorkSpace: workspace,
 	}
 
 	lc := store.NewStoreObject()
 	lc.Define(token.Token{Type: token.IDENT, Value: "Test"}, "Test")
 	e.Define(token.Token{Type: token.IDENT, Value: "GLOBAL"}, lc)
 	return e
+}
+
+func (e *Environment) GetWorkSpace() Workspace {
+	if !WorkSpace.isEmpty(&e.WorkSpace) {
+		return e.WorkSpace
+	}
+	return e.parent.WorkSpace
 }
 
 func (e *Environment) Link(parent *Environment) {
@@ -69,6 +97,12 @@ func (e *Environment) Lookup(name Token) (Environment, Token) {
 func (e *Environment) Set(name Token, val any) {
 	theEnv, tk := e.Lookup(name)
 	if !tk.IsEmpty() {
+		if _, isConst := theEnv.consts[name.Value]; isConst {
+			panic(verror.InterpreterVError{
+				Position: name.ToPosition(e.FileName),
+				Message:  fmt.Sprintf("constant %s cannot be reassigned", LibsUtils.TrasformPrintString(name.Value)),
+			})
+		}
 		theEnv.store[tk] = val
 	} else {
 		if e.MountScope != nil {
@@ -92,6 +126,20 @@ func (e *Environment) Define(name Token, val any) {
 	} else {
 		e.store[name] = val
 		e.nameMap[name.Value] = name
+	}
+}
+
+func (e *Environment) DefineConst(name Token, val any) {
+	_, tk := e.Lookup(name)
+	if !tk.IsEmpty() {
+		panic(verror.InterpreterVError{
+			Position: name.ToPosition(e.FileName),
+			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
+		})
+	} else {
+		e.store[name] = val
+		e.nameMap[name.Value] = name
+		e.consts[name.Value] = struct{}{}
 	}
 }
 
@@ -180,19 +228,55 @@ func (e *Environment) CallFuncObject(fnObject any, args []any) (any, error) {
 	}
 }
 
-func (e *Environment) ImportModule(name string) {
+func (e *Environment) ImportModule(name string) (any, error) {
 	tk := Token{Type: token.IDENT, Value: name}
+
 	if existed, ok := e.Get(tk); ok {
 		if _, isMod := existed.(types.LibsModule); isMod {
-			return
+			return nil, verror.InterpreterVError{
+				Position: Token{}.ToPosition(e.FileName),
+				Message:  fmt.Sprintf("module %s is already imported", LibsUtils.TrasformPrintString(name)),
+			}
 		}
 	}
 	if v, ok := libs.LibsMap[types.LibsKeywords(name)]; ok {
 		e.Define(tk, v)
-	} else {
-		panic(verror.InterpreterVError{
-			Position: Token{}.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("module %s is not defined", LibsUtils.TrasformPrintString(name)),
-		})
+		return nil, nil
 	}
+
+	wk := e.GetWorkSpace()
+	fullPath := filepath.Join(wk.GetBasePath(), name)
+	code, err := os.ReadFile(fullPath)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, verror.InterpreterVError{
+				Position: Token{}.ToPosition(e.FileName),
+				Message:  fmt.Sprintf("module %s is not defined or file not found", LibsUtils.TrasformPrintString(name)),
+			}
+		}
+		return nil, verror.InterpreterVError{
+			Position: Token{}.ToPosition(e.FileName),
+			Message:  fmt.Sprintf("failed to read module %s: %v", LibsUtils.TrasformPrintString(name), err),
+		}
+	}
+
+	oldFileName := e.FileName
+	oldBasePath := wk.GetBasePath()
+
+	e.FileName = name
+	wk.Cd(filepath.Dir(name))
+
+	result, execErr := ExecuteCode(name, string(code), wk)
+
+	e.FileName = oldFileName
+	wk.Cd(oldBasePath)
+
+	if execErr != nil {
+		return nil, execErr
+	}
+
+	e.Define(tk, result)
+
+	return result, nil
 }

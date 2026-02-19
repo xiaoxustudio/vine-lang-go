@@ -10,7 +10,11 @@ import (
 	"vine-lang/verror"
 )
 
-func executeVineFile(filepath string) error {
+func init() {
+	env.SetExecuteCode(executeCode)
+}
+
+func executeVineFile(filepath string, wk env.Workspace) error {
 	defer func() {
 		if r := recover(); r != nil {
 			handleError(r)
@@ -22,21 +26,23 @@ func executeVineFile(filepath string) error {
 		return fmt.Errorf("无法读取文件 %s: %v", filepath, err)
 	}
 
-	return executeCode(filepath, string(bytes))
+	_, err = executeCode(filepath, string(bytes), wk)
+
+	return err
 }
 
-func executeCode(filename string, code string) error {
+func executeCode(filename string, code string, wk env.Workspace) (any, error) {
 	lex := lexer.New(filename, code)
 	lex.Parse()
 
 	p := parser.CreateParser(lex)
 
-	e := env.New(filename)
+	e := env.New(wk)
+	e.FileName = filename
 
 	i := ipt.New(p, e)
-	_, err := i.EvalSafe()
 
-	return err
+	return i.EvalSafe()
 }
 
 func handleError(r any) {

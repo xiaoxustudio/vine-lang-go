@@ -66,7 +66,12 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		} else {
 			return nil, i.Errorf(token.Token{}, "Invalid module name")
 		}
-		env.ImportModule(s.Value)
+
+		_, err := env.ImportModule(s.Value)
+		if err != nil {
+			return nil, err
+		}
+
 		if n.Mode == token.AS {
 			if len(n.Specifiers) != 1 {
 				return nil, i.Errorf(token.Token{}, "use as requires exactly one alias")
@@ -126,16 +131,94 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			} else {
 				return nil, i.Errorf(token.Token{}, "invalid module type for pick")
 			}
+		} else if n.Mode == token.USE {
+			if n.Source != nil && n.Source.Value != nil && n.Source.Value.Type == token.STRING {
+				modAny, exists := env.Get(token.Token{Type: token.IDENT, Value: s.Value})
+				if !exists {
+					return nil, i.Errorf(token.Token{Type: token.IDENT, Value: s.Value}, "module not found after import")
+				}
+				if mod, ok := modAny.(types.LibsModule); ok {
+					mod.ForEach(func(tk token.Token, val any) {
+						env.Define(tk, val)
+					})
+				} else {
+					return nil, i.Errorf(token.Token{}, "invalid module type for use")
+				}
+			}
 		}
 		return s, nil
 	case *ast.ExpressionStmt:
 		return i.Eval(n.Expression, env)
 	case *ast.VariableDecl:
 		val, err := i.Eval(n.Value, env)
-		env.Define(*n.Name.Value, val)
+		if n.IsConst {
+			env.DefineConst(*n.Name.Value, val)
+		} else {
+			env.Define(*n.Name.Value, val)
+		}
 		return val, err
+	case *ast.ExposeStmt:
+		if env.Exports == nil {
+			env.Exports = store.NewStoreObject()
+		}
+
+		if n.Decl != nil {
+			if _, err := i.Eval(n.Decl, env); err != nil {
+				return nil, err
+			}
+
+			switch decl := n.Decl.(type) {
+			case *ast.FunctionDecl:
+				if decl.ID == nil || decl.ID.Value == nil {
+					return nil, i.Errorf(token.Token{}, "invalid expose function")
+				}
+				val, exists := env.Get(*decl.ID.Value)
+				if !exists {
+					return nil, i.Errorf(*decl.ID.Value, "expose target not found")
+				}
+				if err := env.Exports.Define(*decl.ID.Value, val); err != nil {
+					return nil, err
+				}
+				return val, nil
+			case *ast.VariableDecl:
+				if decl.Name == nil || decl.Name.Value == nil {
+					return nil, i.Errorf(token.Token{}, "invalid expose variable")
+				}
+				val, exists := env.Get(*decl.Name.Value)
+				if !exists {
+					return nil, i.Errorf(*decl.Name.Value, "expose target not found")
+				}
+				if err := env.Exports.Define(*decl.Name.Value, val); err != nil {
+					return nil, err
+				}
+				return val, nil
+			default:
+				return nil, i.Errorf(token.Token{}, "invalid expose declaration")
+			}
+		}
+
+		if n.Name != nil && n.Name.Value != nil {
+			if n.Value != nil {
+				val, err := i.Eval(n.Value, env)
+				if err != nil {
+					return nil, err
+				}
+				env.Define(*n.Name.Value, val)
+			}
+
+			val, exists := env.Get(*n.Name.Value)
+			if !exists {
+				return nil, i.Errorf(*n.Name.Value, "expose target not found")
+			}
+			if err := env.Exports.Define(*n.Name.Value, val); err != nil {
+				return nil, err
+			}
+			return val, nil
+		}
+
+		return nil, i.Errorf(token.Token{}, "invalid expose statement")
 	case *ast.ForStmt:
-		loopEnv := environment.New(env.FileName)
+		loopEnv := environment.New(env.WorkSpace)
 		loopEnv.Link(env)
 		if n.Range != nil && n.Init != nil {
 			name, ok := n.Init.(*ast.Literal)
@@ -238,6 +321,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		if operand.Value.Type != token.IDENT {
 			return nil, i.Errorf(*operand.Value, fmt.Sprintf("cannot increment non-variable (type %s)", operand.Value.String()))
 		}
+
 		val, err := i.Eval(n.Right, env)
 		env.Set(*operand.Value, val)
 		return nil, err
@@ -407,7 +491,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			} else if reflect.ValueOf(function).Kind() == reflect.Func {
 				return env.CallFuncObject(function, args)
 			} else if fn, ok := function.(*types.FunctionLikeValNode); ok {
-				newEnv := environment.New(env.FileName)
+				newEnv := environment.New(env.WorkSpace)
 				newEnv.Link(env)
 
 				for index, arg := range fn.Args.Arguments {
@@ -558,6 +642,9 @@ func (i *Interpreter) EvalSafe() (any, error) {
 	v, e := i.Eval(ast, i.env)
 	if e != nil {
 		panic(e)
+	}
+	if i.env.Exports != nil {
+		return types.NewUserModule(i.env.FileName, i.env.Exports), nil
 	}
 	return v, e
 }

@@ -17,7 +17,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		}
 	})
 
-	c.RegisterStmtHandler(token.LET, func(p *Parser) any {
+	c.RegisterStmtHandlerWithKeyWords([]token.TokenType{token.LET, token.CST}, func(p *Parser) any {
 		startToken := p.advance()
 		isConst := startToken.Type == token.CST
 
@@ -185,6 +185,31 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			ID:        p.createLiteral(id),
 			Arguments: args,
 			Body:      p.parseBlockStatement(),
+		}
+	})
+
+	c.RegisterStmtHandler(token.EXPOSE, func(p *Parser) any {
+		p.advance()
+
+		switch p.peek().Type {
+		case token.FN:
+			decl := p.CallStmtHandler(token.FN)
+			return &ast.ExposeStmt{Decl: decl}
+		case token.LET, token.CST:
+			decl := p.CallStmtHandler(p.peek().Type)
+			return &ast.ExposeStmt{Decl: decl}
+		case token.IDENT:
+			idTk := p.expect(token.IDENT)
+			name := p.createLiteral(idTk)
+			if p.peek().Type == token.ASSIGN {
+				p.advance()
+				value := p.parseExpression()
+				return &ast.ExposeStmt{Name: name, Value: value}
+			}
+			return &ast.ExposeStmt{Name: name}
+		default:
+			p.errorf(p.peek(), "unexpected token after expose: %s", p.peek().String())
+			return nil
 		}
 	})
 

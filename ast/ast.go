@@ -369,9 +369,9 @@ type RunStmt struct {
 // ExposeStmt
 type ExposeStmt struct {
 	BaseNode
-	ID         Token
-	Body       Expr
-	Specifiers []Expr
+	Decl  Stmt
+	Name  *Literal
+	Value Expr
 }
 
 // BlockStmt

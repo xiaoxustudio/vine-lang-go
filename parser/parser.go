@@ -45,6 +45,12 @@ func (p *Parser) RegisterStmtHandler(kw token.TokenType, fn func(p *Parser) any)
 	p.handlers[kw] = append(p.handlers[kw], fn)
 }
 
+func (p *Parser) RegisterStmtHandlerWithKeyWords(kw []token.TokenType, fns func(p *Parser) any) {
+	for _, v := range kw {
+		p.RegisterStmtHandler(v, fns)
+	}
+}
+
 func (p *Parser) CallStmtHandler(tk token.TokenType) ast.Stmt {
 	if handlers, ok := p.handlers[tk]; ok {
 		for _, handler := range handlers {
