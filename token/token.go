@@ -84,6 +84,9 @@ const (
 	FALSE    TokenType = "FALSE"
 	NIL      TokenType = "NIL"
 	PICK     TokenType = "PICK"
+	SWITCH   TokenType = "SWITCH"
+	CASE     TokenType = "CASE"
+	DEFAULT  TokenType = "DEFAULT"
 
 	/* Inside Tag */
 	Module TokenType = "__Module_TAG__"
@@ -110,6 +113,9 @@ var Keywords = map[string]TokenType{
 	"false":    FALSE,
 	"nil":      NIL,
 	"end":      END,
+	"switch":   SWITCH,
+	"default":  DEFAULT,
+	"case":     CASE,
 }
 
 type Token struct {

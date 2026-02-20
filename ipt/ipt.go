@@ -312,6 +312,38 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			Body:     n.Body,
 		})
 		return nil, nil
+	case *ast.SwitchStmt:
+		condVal, err := i.Eval(n.Test, env)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, c := range n.Cases {
+			caseValue, ok := c.(*ast.SwitchCase)
+			if !ok {
+				return nil, i.Errorf(token.Token{}, "invalid switch case")
+			}
+			if caseValue != nil {
+				testVal, err := i.Eval(caseValue.Cond, env)
+				if err != nil {
+					return nil, err
+				}
+				if testVal == nil {
+					if caseValue.Body != nil {
+						return i.Eval(caseValue.Body, env)
+					}
+				}
+				ok, err := utils.CompareVal(testVal, token.EQ, condVal)
+				if err != nil {
+					return nil, err
+				}
+				if ok {
+					return i.Eval(caseValue.Body, env)
+				}
+			}
+		}
+
+		return nil, nil
 	case *ast.AssignmentExpr:
 		var err error
 		operand, ok := n.Left.(*ast.Literal)

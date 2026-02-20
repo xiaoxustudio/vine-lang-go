@@ -213,5 +213,27 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		}
 	})
 
+	c.RegisterStmtHandler(token.SWITCH, func(p *Parser) any {
+		p.advance() // skip 'switch'
+		condition := p.parseExpression()
+		p.expect(token.COLON)
+		var isDefinedDefault bool = false
+		var cases []ast.Expr
+		for !p.isEof() && p.peek().Type != token.END {
+			var expr = p.parseSwitchCase()
+			if isDefinedDefault {
+				panic("default case already defined")
+			}
+			if expr != nil {
+				cases = append(cases, expr)
+				if expr.(*ast.SwitchCase).IsDefault {
+					isDefinedDefault = true
+				}
+			}
+		}
+		p.expect(token.END)
+		return &ast.SwitchStmt{Test: condition, Cases: cases}
+	})
+
 	return c
 }

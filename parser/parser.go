@@ -371,6 +371,42 @@ func (p *Parser) parseSuffixExpression() ast.Expr {
 	return left
 }
 
+func (p *Parser) parseSwitchCase() ast.Expr {
+	if p.isEof() {
+		return nil
+	}
+	var kw Token
+	if p.peek().Type == token.CASE || p.peek().Type == token.DEFAULT {
+		kw = p.advance()
+	} else {
+		p.errorf(p.peek(), "unexpected token(switch case): %s", p.peek().String())
+	}
+	var isDefault = kw.Type == token.DEFAULT
+	var node = &ast.SwitchCase{Cond: nil, Body: &ast.BlockStmt{}, IsDefault: isDefault}
+	var cond ast.Expr
+	if !isDefault {
+		for p.peek().Type != token.COLON {
+			cond = p.parseExpression()
+			node.Cond = cond
+		}
+	}
+	p.expect(token.COLON)
+
+	/* 解析body */
+	var body []ast.Stmt
+	for !p.isEof() && !slices.Contains([]token.TokenType{token.DEFAULT, token.BREAK, token.CASE}, p.peek().Type) {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			body = append(body, stmt)
+		}
+	}
+	if p.peek().Type == token.BREAK {
+		p.advance()
+	}
+	node.Body = &ast.BlockStmt{Body: body}
+	return node
+}
+
 func (p *Parser) parsePrimaryExpression() ast.Expr {
 	tk := p.peek()
 

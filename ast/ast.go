@@ -96,11 +96,6 @@ type Specifier interface {
 	Node
 }
 
-// SwitchCase Switch 中 cases 的联合类型接口
-type SwitchCase interface {
-	Node
-}
-
 // ================================== Common Nodes ==================================
 
 type Literal struct {
@@ -449,11 +444,22 @@ func (ifs *ForStmt) String() string {
 	return fmt.Sprintf("ForStmt(%s, %s, %s, %s, %s)", ifs.Init.String(), ifs.Value.String(), ifs.Update.String(), ifs.Range, ifs.Body.String())
 }
 
+type SwitchCase struct {
+	BaseNode
+	Cond      Expr
+	Body      *BlockStmt
+	IsDefault bool // 是否为默认情况
+}
+
+func (s *SwitchCase) String() string {
+	return fmt.Sprintf("SwitchCase(%s, %s)", s.Cond.String(), s.Body.String())
+}
+
 // SwitchStmt
 type SwitchStmt struct {
 	BaseNode
 	Test  Expr
-	Cases []SwitchCase
+	Cases []Expr
 }
 
 // ExpressionStmt
