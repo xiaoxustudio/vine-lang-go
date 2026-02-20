@@ -1,0 +1,12 @@
+use glb pick print
+use "./module.vine"
+use "./module.vine" pick add
+
+print(STATE)
+print(STATE.a)
+# print(AA)
+print(add(2, 1))
+
+# cst a = 3
+# a = 4
+# print(a)
