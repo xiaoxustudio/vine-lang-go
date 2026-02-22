@@ -1,0 +1,30 @@
+use glb pick print
+
+let a = 1
+
+
+# 基础语法
+
+switch a :
+    case 1:
+        print("a is 1")
+        break
+    case 2:
+        print("a is 2")
+        break
+    default:
+        print("a is not 1 or 2")
+        break
+end
+
+
+# 多条件
+
+switch a :
+    case 1,2 :
+        print("a is 1 or 2")
+        # break 可以省略
+    default:
+        print("a is not 1 or 2")
+        break
+end
