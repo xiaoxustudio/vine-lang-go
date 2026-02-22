@@ -312,6 +312,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			Body:     n.Body,
 		})
 		return nil, nil
+	case *ast.ReturnStmt:
+		return i.Eval(n.Value, env)
 	case *ast.SwitchStmt:
 		condVal, err := i.Eval(n.Test, env)
 		if err != nil {

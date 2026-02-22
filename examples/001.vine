@@ -7,5 +7,10 @@ fn add(a,b):
     a + b
 end
 
+fn sub(a,b):
+    return a - b
+end
+
 print(add(a,2))
+print(sub(a,2))
 

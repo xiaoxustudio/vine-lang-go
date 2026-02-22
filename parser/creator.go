@@ -235,5 +235,10 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		return &ast.SwitchStmt{Test: condition, Cases: cases}
 	})
 
+	c.RegisterStmtHandler(token.RETURN, func(p *Parser) any {
+		p.advance() // skip 'return'
+		return &ast.ReturnStmt{Value: p.parseExpression()}
+	})
+
 	return c
 }
