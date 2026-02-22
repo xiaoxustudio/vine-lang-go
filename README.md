@@ -1,29 +1,45 @@
 # vine-lang
 
-vine-lang 是基于 Go 语言实现的 [Vine programming language](https://github.com/xiaoxustudio/vine-lang).
+> [English](./README.md) | [简体中文](./README.zh_cn.md)
 
-# 安装
+Vine Lang is a programming language based on Go language implementation [Vine programming language](https://github.com/xiaoxustudio/vine-lang).
 
-下载`Release`界面的`vine-lang`二进制文件
+### Installation
 
-放置到任意目录即可使用。
+Download the `vine lang` binary file for the `Release` interface
 
-推荐添加到`PATH`中，方便使用。
+Simply place it in any directory to use.
 
-# 使用
+Recommend adding it to `PATH` for easy use.
+
+### Use
+
+Single file execution
 
 ```shell
 vine examples\001.vine
 ```
 
-# 关于
+execute a project
 
-作者：[徐然](https://github.com/xiaoxustudio)
+```shell
+Vine examples # folder contains vine.project.y[a]ml configuration file
+```
 
-联系方式：[xugame@qq.com](emailto://xugame@qq.com)
+#### Create Project
 
-欢迎提出您宝贵的 **issue**，我们将会处理。
+```shell
+vine create vine-project
+```
 
-# LICENSE
+## Regarding 
 
-[MIT](./LICENSE)
+Author: [Xu Ran](https://github.com/xiaoxustudio) 
+
+Contact Information: [xiaoxustudio@foxmail.com](mailto:xiaoxustudio@foxmail.com) 
+
+Please feel free to raise your valuable "issue", and we will handle it. 
+
+## LICENSE
+
+The project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
