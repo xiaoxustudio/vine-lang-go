@@ -1,1 +1,1 @@
-sh dev.sh "examples\001.vine"
+sh dev.sh "examples"

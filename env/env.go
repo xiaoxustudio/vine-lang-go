@@ -61,7 +61,7 @@ func New(workspace Workspace) *Environment {
 }
 
 func (e *Environment) GetWorkSpace() Workspace {
-	if !WorkSpace.isEmpty(&e.WorkSpace) {
+	if !WorkSpace.IsEmpty(&e.WorkSpace) {
 		return e.WorkSpace
 	}
 	return e.parent.WorkSpace

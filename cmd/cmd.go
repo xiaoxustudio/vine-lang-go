@@ -7,6 +7,7 @@ import (
 
 	"vine-lang/env"
 	"vine-lang/repl"
+	"vine-lang/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -26,18 +27,8 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		wk, err := GetWorkSpaceWithArgs(args)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		// 执行文件
-		filepath := args[0]
-		if err := executeVineFile(filepath, *wk); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
+		// 有参数时执行文件或项目
+		RunProjectOrFile(cmd, args)
 	},
 }
 
@@ -50,29 +41,67 @@ var replCmd = &cobra.Command{
 	},
 }
 
-var runCmd = &cobra.Command{
-	Use:   "run <file>",
-	Short: "run a vine script file",
+var createCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a simple vine",
+	Long:  `This command will be create a project for Vine Language`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		filepath := args[0]
-		wk, err := GetWorkSpaceWithArgs(args)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		if err := executeVineFile(filepath, *wk); err != nil {
+		name := args[0]
+		if err := createProject(name); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	},
 }
 
+var runCmd = &cobra.Command{
+	Use:   "run <file>",
+	Short: "run a vine script file",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		RunProjectOrFile(cmd, args)
+	},
+}
+
+// 执行文件或项目
+func RunProjectOrFile(cmd *cobra.Command, args []string) {
+	wk, err := GetWorkSpaceWithArgs(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	info, err := os.Stat(args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s does not exist\n", args[0])
+		os.Exit(1)
+	}
+
+	var targetFileName = args[0]
+
+	if info.IsDir() {
+		infoM, err := wk.Info()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		targetFileName = filepath.Join(targetFileName, infoM.Main)
+	}
+
+	finnal, err := filepath.Abs(targetFileName)
+
+	if err := executeVineFile(finnal, *wk); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
 func init() {
 	// 添加子命令
 	rootCmd.AddCommand(replCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(createCmd)
 
 	// 自定义版本输出
 	rootCmd.SetVersionTemplate(`Vine Language {{.Version}} for xuran`)
@@ -92,7 +121,7 @@ func AddCommand(cmd *cobra.Command) {
 
 // findRootPath 从指定目录向上查找标志文件，确定根目录
 func findRootPath(startDir string) (string, error) {
-	markers := []string{".git", "vine.project"}
+	markers := append([]string{".git"}, utils.ProjectConfigFile...)
 
 	current := startDir
 	for {
@@ -154,4 +183,24 @@ func GetWorkSpaceWithArgs(args []string) (*env.Workspace, error) {
 	}
 
 	return ws, nil
+}
+
+// 创建项目
+func createProject(name string) error {
+	// 判断本地是否存在
+	if _, err := os.Stat(name); err == nil {
+		fmt.Fprintf(os.Stderr, "Error: %s already exists\n", name)
+		os.Exit(1)
+	}
+	// 创建项目
+	os.Mkdir(name, os.ModePerm)
+	os.Mkdir(filepath.Join(name, "src"), os.ModePerm)
+	os.WriteFile(filepath.Join(name, "src", "main.vine"), []byte("print('Hello, World!')"), os.ModePerm)
+	os.WriteFile(filepath.Join(name, "vine.project.yml"), []byte(fmt.Sprintf(
+		`name: %s
+version: 0.0.0
+main: src/main.vine
+author: vine
+`, name)), os.ModePerm)
+	return nil
 }
