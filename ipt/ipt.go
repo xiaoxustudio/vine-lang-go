@@ -520,13 +520,12 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			}
 
 			if fn, ok := function.(token.Token); ok {
-				v, e := env.CallFunc(fn, args)
-				return v, e
+				return env.CallFunc(fn, args)
 			} else if reflect.ValueOf(function).Kind() == reflect.Func {
 				return env.CallFuncObject(function, args)
 			} else if fn, ok := function.(*types.FunctionLikeValNode); ok {
 				newEnv := environment.New(env.WorkSpace)
-				newEnv.Link(env)
+				newEnv.Link(env) // 继承父环境
 
 				for index, arg := range fn.Args.Arguments {
 					name, ok := arg.(*ast.Literal)
@@ -536,7 +535,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 					if len(args) <= index {
 						return nil, i.Errorf(token.Token{}, "Not enough arguments")
 					}
-					env.Define(*name.Value, args[index])
+					newEnv.DefinePassing(*name.Value, args[index])
 				}
 
 				res, err := i.Eval(fn.Body, newEnv)

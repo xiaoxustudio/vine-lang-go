@@ -41,6 +41,7 @@ type Environment struct {
 	MountScope types.Scope // 挂载的Scope，可能是对象什么的
 	WorkSpace  Workspace
 	Exports    *store.StoreObject
+	isPassing  bool // 是否正在定义临时参数，将不查找父级
 }
 
 func New(workspace Workspace) *Environment {
@@ -50,6 +51,7 @@ func New(workspace Workspace) *Environment {
 		nameMap:   make(map[string]Token), // for faster lookup
 		consts:    make(map[string]struct{}),
 		WorkSpace: workspace,
+		isPassing: false,
 	}
 
 	lc := store.NewStoreObject()
@@ -87,7 +89,7 @@ func (e *Environment) Lookup(name Token) (Environment, Token) {
 	if tk, exists := e.nameMap[name.Value]; exists {
 		return *e, tk
 	}
-	if e.parent != nil {
+	if e.parent != nil && !e.isPassing {
 		return e.parent.Lookup(name)
 	}
 
@@ -127,6 +129,12 @@ func (e *Environment) Define(name Token, val any) {
 		e.store[name] = val
 		e.nameMap[name.Value] = name
 	}
+}
+
+func (e *Environment) DefinePassing(name Token, val any) {
+	e.isPassing = true
+	e.Define(name, val)
+	e.isPassing = false
 }
 
 func (e *Environment) DefineConst(name Token, val any) {
