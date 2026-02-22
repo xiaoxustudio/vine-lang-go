@@ -324,21 +324,23 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 				return nil, i.Errorf(token.Token{}, "invalid switch case")
 			}
 			if caseValue != nil {
-				testVal, err := i.Eval(caseValue.Cond, env)
-				if err != nil {
-					return nil, err
-				}
-				if testVal == nil {
-					if caseValue.Body != nil {
+				for _, test := range caseValue.Conds {
+					testVal, err := i.Eval(test, env)
+					if err != nil {
+						return nil, err
+					}
+					if testVal == nil {
+						if caseValue.Body != nil {
+							return i.Eval(caseValue.Body, env)
+						}
+					}
+					ok, err := utils.CompareVal(testVal, token.EQ, condVal)
+					if err != nil {
+						return nil, err
+					}
+					if ok {
 						return i.Eval(caseValue.Body, env)
 					}
-				}
-				ok, err := utils.CompareVal(testVal, token.EQ, condVal)
-				if err != nil {
-					return nil, err
-				}
-				if ok {
-					return i.Eval(caseValue.Body, env)
 				}
 			}
 		}

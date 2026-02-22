@@ -446,13 +446,17 @@ func (ifs *ForStmt) String() string {
 
 type SwitchCase struct {
 	BaseNode
-	Cond      Expr
+	Conds     []Expr
 	Body      *BlockStmt
 	IsDefault bool // 是否为默认情况
 }
 
 func (s *SwitchCase) String() string {
-	return fmt.Sprintf("SwitchCase(%s, %s)", s.Cond.String(), s.Body.String())
+	var conds = make([]string, len(s.Conds))
+	for i, cond := range s.Conds {
+		conds[i] = cond.String()
+	}
+	return fmt.Sprintf("SwitchCase(%s, %s)", strings.Join(conds, ","), s.Body.String())
 }
 
 // SwitchStmt

@@ -1,13 +1,22 @@
 use glb pick print
 
-let a = 455
+let a = 2
 
 switch a :
-    case 1 :
+    case 1:
         print("a is 1")
         break
-    case 2 :
+    case 2:
         print("a is 2")
+        break
+    default:
+        print("a is not 1 or 2")
+        break
+end
+
+switch a :
+    case 1,2 :
+        print("a is 1 or 2")
         break
     default:
         print("a is not 1 or 2")

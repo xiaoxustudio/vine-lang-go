@@ -382,12 +382,15 @@ func (p *Parser) parseSwitchCase() ast.Expr {
 		p.errorf(p.peek(), "unexpected token(switch case): %s", p.peek().String())
 	}
 	var isDefault = kw.Type == token.DEFAULT
-	var node = &ast.SwitchCase{Cond: nil, Body: &ast.BlockStmt{}, IsDefault: isDefault}
+	var node = &ast.SwitchCase{Conds: nil, Body: &ast.BlockStmt{}, IsDefault: isDefault}
 	var cond ast.Expr
 	if !isDefault {
 		for p.peek().Type != token.COLON {
+			if p.peek().Type == token.COMMA {
+				p.advance()
+			}
 			cond = p.parseExpression()
-			node.Cond = cond
+			node.Conds = append(node.Conds, cond)
 		}
 	}
 	p.expect(token.COLON)
