@@ -12,6 +12,7 @@ const (
 
 var (
 	GlobalTaskArray = make([]*TaskObject, 0)
+	mu              sync.Mutex
 )
 
 type TaskObject struct {
@@ -28,26 +29,31 @@ func NewTaskObject(fn func(args ...[]any) any) *TaskObject {
 		state: TaskStateReady,
 		fn:    fn,
 	}
+	mu.Lock()
 	GlobalTaskArray = append(GlobalTaskArray, instance)
+	mu.Unlock()
+
 	return instance
 }
 
 func (t *TaskObject) Run(args ...[]any) {
 	t.state = TaskStateRunning
 
-	t.wg.Add(1)
-
-	go func() {
-		defer t.wg.Done()
+	t.wg.Go(func() {
 
 		t.result = t.fn(args...)
 
 		t.Done()
-	}()
+	})
 }
 
 func WaitAll() {
-	for _, v := range GlobalTaskArray {
+	mu.Lock()
+	tasks := make([]*TaskObject, len(GlobalTaskArray))
+	copy(tasks, GlobalTaskArray)
+	mu.Unlock()
+
+	for _, v := range tasks {
 		v.Wait()
 	}
 }
@@ -63,10 +69,18 @@ func (t *TaskObject) Done() {
 }
 
 func (t *TaskObject) Dispose() {
+	mu.Lock()
 	for i, v := range GlobalTaskArray {
 		if v == t {
 			GlobalTaskArray = append(GlobalTaskArray[:i], GlobalTaskArray[i+1:]...)
 			break
 		}
 	}
+	mu.Unlock()
+}
+
+func ClearAll() {
+	mu.Lock()
+	GlobalTaskArray = make([]*TaskObject, 0)
+	mu.Unlock()
 }
