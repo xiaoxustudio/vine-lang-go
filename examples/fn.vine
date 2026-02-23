@@ -17,7 +17,7 @@ glb.print(res)
 
 fn b_fn(val):
     glb.print("你给我的值为："+val)
-    val # 返回值
+    return val # 返回值
 end
 
 let res2 = b_fn("哈哈哈哈")

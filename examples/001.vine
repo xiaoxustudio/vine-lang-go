@@ -1,16 +1,16 @@
 use glb pick print
 
-let a = 2
 
-fn add(a,b):
-    a = 5
-    a + b
+task fn a():
+    print("执行函数a")
 end
 
-fn sub(a,b):
-    return a - b
+
+task fn b():
+    print("b函数被执行")
+    return 1
 end
 
-print(add(a,2))
-print(sub(a,2))
-
+b()
+print("执行脚本")
+a()

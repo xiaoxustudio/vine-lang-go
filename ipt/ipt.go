@@ -7,6 +7,7 @@ import (
 	"vine-lang/ast"
 	environment "vine-lang/env"
 	"vine-lang/object/store"
+	"vine-lang/object/task"
 	"vine-lang/parser"
 	"vine-lang/token"
 	"vine-lang/types"
@@ -310,6 +311,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			Token:    n.ID.Value,
 			Args:     n.Arguments,
 			Body:     n.Body,
+			IsTask:   false,
 		})
 		return nil, nil
 	case *ast.ReturnStmt:
@@ -347,6 +349,17 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			}
 		}
 
+		return nil, nil
+	case *ast.TaskStmt:
+		env.Define(*n.Fn.ID.Value, &types.FunctionLikeValNode{
+			IsLamda:  false,
+			IsModule: false,
+			IsInside: false,
+			Token:    n.Fn.ID.Value,
+			Args:     n.Fn.Arguments,
+			Body:     n.Fn.Body,
+			IsTask:   true,
+		})
 		return nil, nil
 	case *ast.AssignmentExpr:
 		var err error
@@ -540,11 +553,23 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 					newEnv.DefinePassing(*name.Value, args[index])
 				}
 
-				res, err := i.Eval(fn.Body, newEnv)
-				if err != nil {
-					return nil, err
+				if fn.IsTask {
+					tk := task.NewTaskObject(func(args ...[]any) any {
+						res, err := i.Eval(fn.Body, newEnv)
+						if err != nil {
+							return err
+						}
+						return res
+					})
+					tk.Run()
+					return tk, nil
+				} else {
+					res, err := i.Eval(fn.Body, newEnv)
+					if err != nil {
+						return nil, err
+					}
+					return res, nil
 				}
-				return res, nil
 			} else {
 				return nil, i.Errorf(token.Token{}, "Not a function")
 			}
@@ -676,8 +701,12 @@ func (i *Interpreter) EvalSafe() (any, error) {
 	// ast.Print()
 	v, e := i.Eval(ast, i.env)
 	if e != nil {
-		panic(e)
+		return nil, e
 	}
+
+	// 保证所有任务都执行完毕
+	task.WaitAll()
+
 	if i.env.Exports != nil {
 		return types.NewUserModule(i.env.FileName, i.env.Exports), nil
 	}

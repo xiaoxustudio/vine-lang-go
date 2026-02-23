@@ -240,5 +240,13 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		return &ast.ReturnStmt{Value: p.parseExpression()}
 	})
 
+	c.RegisterStmtHandler(token.TASK, func(p *Parser) any {
+		p.advance() // skip 'task'
+		fn := p.parseStatement()
+		return &ast.TaskStmt{
+			Fn: fn.(*ast.FunctionDecl),
+		}
+	})
+
 	return c
 }

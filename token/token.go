@@ -77,7 +77,7 @@ const (
 	CONTINUE TokenType = "CONTINUE"
 	USE      TokenType = "USE"
 	AS       TokenType = "AS"
-	task     TokenType = "TASK"
+	TASK     TokenType = "TASK"
 	EXPOSE   TokenType = "EXPOSE"
 	TYPEOF   TokenType = "TYPEOF"
 	TRUE     TokenType = "TRUE"
@@ -106,7 +106,7 @@ var Keywords = map[string]TokenType{
 	"use":      USE,
 	"as":       AS,
 	"pick":     PICK,
-	"task":     task,
+	"task":     TASK,
 	"expose":   EXPOSE,
 	"typeof":   TYPEOF,
 	"true":     TRUE,

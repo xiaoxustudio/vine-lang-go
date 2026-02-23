@@ -131,6 +131,7 @@ func (e *Environment) Define(name Token, val any) {
 	}
 }
 
+// 定义临时参数
 func (e *Environment) DefinePassing(name Token, val any) {
 	e.isPassing = true
 	e.Define(name, val)
