@@ -12,7 +12,6 @@ const (
 
 var (
 	GlobalTaskArray = make([]*TaskObject, 0)
-	globalWg        sync.WaitGroup
 )
 
 type TaskObject struct {
@@ -21,6 +20,7 @@ type TaskObject struct {
 	state  TaskObjectStatus
 	wg     sync.WaitGroup
 	fn     func(args ...[]any) any
+	result any
 }
 
 func NewTaskObject(fn func(args ...[]any) any) *TaskObject {
@@ -35,25 +35,26 @@ func NewTaskObject(fn func(args ...[]any) any) *TaskObject {
 func (t *TaskObject) Run(args ...[]any) {
 	t.state = TaskStateRunning
 
-	globalWg.Add(1)
 	t.wg.Add(1)
 
 	go func() {
-		defer globalWg.Done()
 		defer t.wg.Done()
 
-		t.fn(args...)
+		t.result = t.fn(args...)
 
 		t.Done()
 	}()
 }
 
 func WaitAll() {
-	globalWg.Wait()
+	for _, v := range GlobalTaskArray {
+		v.Wait()
+	}
 }
 
-func (t *TaskObject) Wait() {
+func (t *TaskObject) Wait() any {
 	t.wg.Wait()
+	return t.result
 }
 
 func (t *TaskObject) Done() {

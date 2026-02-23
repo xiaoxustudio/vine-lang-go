@@ -361,6 +361,15 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			IsTask:   true,
 		})
 		return nil, nil
+	case *ast.WaitStmt:
+		target, err := i.Eval(n.Async, env)
+		if err != nil {
+			return nil, err
+		}
+		if taskObject, ok := target.(*task.TaskObject); ok {
+			return taskObject.Wait(), nil
+		}
+		return nil, nil
 	case *ast.AssignmentExpr:
 		var err error
 		operand, ok := n.Left.(*ast.Literal)

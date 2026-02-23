@@ -354,13 +354,6 @@ type IterableExpr struct {
 
 // ================================== Statements ==================================
 
-// RunStmt
-type RunStmt struct {
-	BaseNode
-	Callee *CallExpr
-	To     []*ToExpr
-}
-
 // ExposeStmt
 type ExposeStmt struct {
 	BaseNode
@@ -485,5 +478,5 @@ type TaskStmt struct {
 // WaitStmt
 type WaitStmt struct {
 	BaseNode
-	Async *RunStmt
+	Async Expr
 }

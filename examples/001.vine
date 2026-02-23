@@ -8,9 +8,16 @@ end
 
 task fn b():
     print("b函数被执行")
+end
+
+task fn c():
+    print("c函数被执行")
     return 1
 end
 
+
+c()
 b()
-print("执行脚本")
+print("开始执行脚本")
 a()
+

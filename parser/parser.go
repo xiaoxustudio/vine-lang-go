@@ -439,6 +439,8 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 		op := p.advance()
 		right := p.parseSuffixExpression()
 		return &ast.UnaryExpr{Operator: op, Value: right, IsSuffix: false}
+	case token.WAIT:
+		return p.CallStmtHandler(token.WAIT)
 	default:
 		p.errorf(tk, "unexpected token: %s", tk.String())
 		return nil

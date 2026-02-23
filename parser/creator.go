@@ -248,5 +248,10 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		}
 	})
 
+	c.RegisterStmtHandler(token.WAIT, func(p *Parser) any {
+		p.advance() // skip 'wait'
+		return &ast.WaitStmt{Async: p.parseExpression()}
+	})
+
 	return c
 }
