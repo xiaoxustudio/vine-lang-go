@@ -175,7 +175,7 @@ type LambdaFunctionDecl struct {
 // VariableDecl
 type VariableDecl struct {
 	BaseNode
-	Name    *Literal
+	Name    Literal
 	Value   Expr
 	IsConst bool
 }
@@ -333,13 +333,6 @@ func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("BinaryExpr(%s %s %s)", b.Left.String(), b.Operator.String(), b.Right.String())
 }
 
-// ToExpr
-type ToExpr struct {
-	BaseNode
-	Body      *BlockStmt
-	Arguments []Expr
-}
-
 // TemplateLiteralExpr
 type TemplateLiteralExpr struct {
 	BaseNode
@@ -379,21 +372,33 @@ func (b *BlockStmt) String() string {
 // CaseBlockStmt
 type CaseBlockStmt struct {
 	BaseNode
-	Body *BlockStmt
+	Body BlockStmt
 	Test Expr
+}
+
+func (b *CaseBlockStmt) String() string {
+	return fmt.Sprintf("CaseBlockStmt(%s, %s)", b.Test.String(), b.Body.String())
 }
 
 // DefaultCaseBlockStmt
 type DefaultCaseBlockStmt struct {
 	BaseNode
-	Body *BlockStmt
+	Body BlockStmt
 	Test Expr
+}
+
+func (b *DefaultCaseBlockStmt) String() string {
+	return fmt.Sprintf("DefaultCaseBlockStmt(%s, %s)", b.Test.String(), b.Body.String())
 }
 
 // ReturnStmt
 type ReturnStmt struct {
 	BaseNode
 	Value Expr
+}
+
+func (r *ReturnStmt) String() string {
+	return fmt.Sprintf("ReturnStmt(%s)", r.Value.String())
 }
 
 // ProgramStmt
@@ -430,7 +435,7 @@ type ForStmt struct {
 	Value  Expr
 	Update Expr
 	Range  Expr
-	Body   *BlockStmt
+	Body   BlockStmt
 }
 
 func (ifs *ForStmt) String() string {
@@ -472,11 +477,43 @@ func (e *ExpressionStmt) String() string {
 // TaskStmt
 type TaskStmt struct {
 	BaseNode
-	Fn *FunctionDecl
+	Fn FunctionDecl
+}
+
+func (task *TaskStmt) String() string {
+	return fmt.Sprintf("TaskStmt(%v)", task.Fn)
 }
 
 // WaitStmt
 type WaitStmt struct {
 	BaseNode
 	Async Expr
+}
+
+func (wait *WaitStmt) String() string {
+	return fmt.Sprintf("WaitStmt(%v)", wait.Async)
+}
+
+type CallTaskFn struct {
+	BaseNode
+	Target CallExpr
+	To     ToExpr
+}
+
+func (c *CallTaskFn) String() string {
+	return fmt.Sprintf("CallTaskFn(%v, %v)", c.Target.String(), c.To.String())
+}
+
+type ToExpr struct {
+	BaseNode
+	Body BlockStmt
+	Args ArgsExpr
+	Next *ToExpr
+}
+
+func (t *ToExpr) String() string {
+	if t.Next == nil {
+		return fmt.Sprintf("ToExpr(%s , %s)", t.Body.String(), t.Args.String())
+	}
+	return fmt.Sprintf("ToExpr(%s , %s, %s)", t.Body.String(), t.Args.String(), t.Next.String())
 }

@@ -93,3 +93,19 @@ type FunctionLikeValNode struct {
 	IsInside bool // 是否是模块内部函数
 	IsTask   bool // 是否是协程函数
 }
+
+// 任务
+type TaskToValNode struct {
+	env     any
+	Current func() any
+	Parnet  any
+	Next    *TaskToValNode
+}
+
+func (v *TaskToValNode) Env(env any) any {
+	if env == nil {
+		return v.env
+	}
+	v.env = env
+	return v.env
+}

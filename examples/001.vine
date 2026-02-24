@@ -6,8 +6,8 @@ task fn a():
 end
 
 
-task fn b():
-    print("b函数被执行")
+task fn b(res):
+    print("b函数被执行",res)
 end
 
 task fn c():
@@ -15,9 +15,22 @@ task fn c():
     return 1
 end
 
+task fn call():
+    print("call函数被执行")
+    return 123
+end
 
-c()
-b()
-print("开始执行脚本")
-a()
+# b(123)
+# print("开始执行脚本")
+# a()
+# c()
 
+call() 
+    to (res):
+        print("call函数的执行结果：", res)
+        res
+    to (res2):
+        res2 + 2
+    to ():
+        print("最后的运行")
+end

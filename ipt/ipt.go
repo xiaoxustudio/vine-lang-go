@@ -182,7 +182,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 				}
 				return val, nil
 			case *ast.VariableDecl:
-				if decl.Name == nil || decl.Name.Value == nil {
+				if decl.Name.Value == nil {
 					return nil, i.Errorf(token.Token{}, "invalid expose variable")
 				}
 				val, exists := env.Get(*decl.Name.Value)
@@ -239,7 +239,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 					bodyEnv.Define(*name.Value, reflect.ValueOf(value).Index(index).Interface())
 					bodyEnv.Link(loopEnv)
 
-					_, err := i.Eval(n.Body, bodyEnv)
+					_, err := i.Eval(&n.Body, bodyEnv)
 
 					bodyEnv.Release()
 
@@ -273,7 +273,7 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			bodyEnv := environment.NewPooled(env.FileName)
 			bodyEnv.Link(loopEnv)
 
-			res, err := i.Eval(n.Body, bodyEnv)
+			res, err := i.Eval(&n.Body, bodyEnv)
 
 			bodyEnv.Release()
 
@@ -370,6 +370,86 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			return taskObject.Wait(), nil
 		}
 		return nil, nil
+	case *ast.CallTaskFn:
+		target, err := i.Eval(&n.Target, env)
+		if err != nil {
+			return nil, err
+		}
+		if taskFn, ok := target.(*task.TaskObject); ok {
+			taskFn.Next(func(args ...[]any) any {
+				parentTaskResult := taskFn.GetResult()
+				currentToStmt := n.To
+				newEnv := environment.New(env.WorkSpace)
+				newEnv.Link(env)
+				currentToStmtArgs := currentToStmt.Args.Arguments
+				if len(currentToStmtArgs) > 0 {
+					newEnv.Define(*currentToStmtArgs[0].(*ast.Literal).Value, parentTaskResult)
+				}
+				r, err := i.Eval(&n.To, newEnv)
+				if err != nil {
+					return err
+				}
+				TaskTo, ok := r.(*types.TaskToValNode)
+				if !ok {
+					return nil
+				}
+
+				var res any
+				theTaskTo := TaskTo
+				for {
+					if theTaskTo.Env(nil) == nil {
+						theTaskTo.Env(newEnv)
+					}
+					theTaskTo.Parnet = taskFn
+					res = theTaskTo.Current()
+					if theTaskTo.Next == nil {
+						break
+					}
+					theTaskTo = theTaskTo.Next
+				}
+				return res
+			}).Run()
+			return nil, nil
+		}
+		return nil, i.Errorf(token.Token{}, "not a task function")
+	case *ast.ToExpr:
+		var Next *types.TaskToValNode
+		if n.Next != nil {
+			// 将Expr转换为 TaskToValNode
+			next, err := i.Eval(n.Next, env)
+			if err != nil {
+				return nil, err
+			}
+			Next = next.(*types.TaskToValNode)
+		}
+
+		// 创建一个新的 task To Node
+		var toVal = types.TaskToValNode{
+			Next: Next,
+		}
+
+		toVal.Current = func() any {
+			_currentEnv := toVal.Env(nil)
+			currentEnv := _currentEnv.(*environment.Environment)
+			res, err := i.Eval(&n.Body, currentEnv)
+			if err != nil {
+				return nil
+			}
+
+			// 为next节点定义 result 参数
+			if Next != nil {
+				nextEnv := environment.New(env.WorkSpace)
+				currentToStmt := n.Next
+				nextEnv.Link(currentEnv)
+				currentToStmtArgs := currentToStmt.Args.Arguments
+				if len(currentToStmtArgs) > 0 {
+					nextEnv.Define(*currentToStmtArgs[0].(*ast.Literal).Value, res)
+				}
+				Next.Env(nextEnv)
+			}
+			return res
+		}
+		return &toVal, nil
 	case *ast.AssignmentExpr:
 		var err error
 		operand, ok := n.Left.(*ast.Literal)

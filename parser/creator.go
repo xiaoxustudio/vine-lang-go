@@ -6,6 +6,7 @@ import (
 	"vine-lang/ast"
 	"vine-lang/lexer"
 	"vine-lang/token"
+	"vine-lang/verror"
 )
 
 func CreateParser(lex *lexer.Lexer) *Parser {
@@ -23,7 +24,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 
 		idTk := p.expect(token.IDENT)
 
-		id := &ast.Literal{Value: &idTk}
+		id := ast.Literal{Value: &idTk}
 		p.expect(token.ASSIGN)
 
 		value := p.parseExpression()
@@ -157,7 +158,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			iter := p.parseExpression()
 			body = p.parseBlockStatement()
 			return &ast.ForStmt{
-				Body:  body,
+				Body:  *body,
 				Init:  firstExpr,
 				Range: iter,
 			}
@@ -169,7 +170,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		thirdExpr := p.parseExpression()
 		body = p.parseBlockStatement()
 		return &ast.ForStmt{
-			Body:   body,
+			Body:   *body,
 			Init:   firstExpr,
 			Value:  secondExpr,
 			Update: thirdExpr,
@@ -243,9 +244,17 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 	c.RegisterStmtHandler(token.TASK, func(p *Parser) any {
 		p.advance() // skip 'task'
 		fn := p.parseStatement()
-		return &ast.TaskStmt{
-			Fn: fn.(*ast.FunctionDecl),
+		if fn != nil {
+			if f, ok := fn.(*ast.FunctionDecl); ok {
+				return &ast.TaskStmt{
+					Fn: *f,
+				}
+			}
 		}
+		panic(verror.ParseVError{
+			Position: p.peek().ToPosition(""),
+			Message:  "expected function declaration",
+		})
 	})
 
 	c.RegisterStmtHandler(token.WAIT, func(p *Parser) any {

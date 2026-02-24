@@ -88,6 +88,7 @@ const (
 	CASE     TokenType = "CASE"
 	DEFAULT  TokenType = "DEFAULT"
 	WAIT     TokenType = "WAIT"
+	TO       TokenType = "TO"
 
 	/* Inside Tag */
 	Module TokenType = "__Module_TAG__"
@@ -118,6 +119,7 @@ var Keywords = map[string]TokenType{
 	"default":  DEFAULT,
 	"case":     CASE,
 	"wait":     WAIT,
+	"to":       TO,
 }
 
 type Token struct {

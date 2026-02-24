@@ -36,15 +36,40 @@ func NewTaskObject(fn func(args ...[]any) any) *TaskObject {
 	return instance
 }
 
+func (t *TaskObject) GetResult() any {
+	return t.Wait()
+}
+
+func (t *TaskObject) IsRunning() bool {
+	return t.state == TaskStateRunning
+}
+
+func (t *TaskObject) IsReady() bool {
+	return t.state == TaskStateReady
+}
+
+func (t *TaskObject) IsDone() bool {
+	return t.state == TaskStateDone
+}
+
+func (t *TaskObject) GetParent() *TaskObject {
+	return t.parent
+}
+
 func (t *TaskObject) Run(args ...[]any) {
 	t.state = TaskStateRunning
 
 	t.wg.Go(func() {
-
 		t.result = t.fn(args...)
-
 		t.Done()
 	})
+}
+
+func (t *TaskObject) Next(fn func(args ...[]any) any) *TaskObject {
+	next := NewTaskObject(fn)
+	next.parent = t
+	t.next = next
+	return next
 }
 
 func WaitAll() {

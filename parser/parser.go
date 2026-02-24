@@ -293,7 +293,46 @@ func (p *Parser) parseCallExpression() ast.Expr {
 		args := p.parseArgs()
 		p.expect(token.RPAREN)
 		left = &ast.CallExpr{Callee: left, Args: *args}
+		var parentToStmt = &ast.ToExpr{Next: nil}
+		var currentToStmt = parentToStmt
+		if p.peek().Type == token.TO {
+			for p.peek().Type == token.TO {
+				p.advance()
+				toStmt := &ast.ToExpr{}
+				if p.peek().Type == token.LPAREN {
+					p.advance()
+					args := p.parseArgs()
+					p.expect(token.RPAREN)
+					toStmt.Args = *args
+				}
+				p.expect(token.COLON)
+				var block = &ast.BlockStmt{Body: []ast.Stmt{}}
+				for !slices.Contains([]token.TokenType{token.TO, token.END}, p.peek().Type) && !p.isEof() {
+					stmt := p.parseStatement()
+					if stmt != nil {
+						block.Body = append(block.Body, stmt)
+					}
+				}
+				toStmt.Body = *block
+				currentToStmt.Next = toStmt
+				if p.peek().Type == token.TO {
+					currentToStmt = toStmt
+				}
+			}
+			p.expect(token.END)
+
+			target, ok := left.(*ast.CallExpr)
+			if !ok {
+				return left
+			}
+
+			return &ast.CallTaskFn{
+				Target: *target,
+				To:     *parentToStmt.Next,
+			}
+		}
 	}
+
 	return left
 }
 
