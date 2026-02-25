@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "v1.0.0"
+const version = "v1.0.1"
 
 var rootCmd = &cobra.Command{
 	Use:     "vine [file]",
@@ -198,9 +198,9 @@ func createProject(name string) error {
 	os.WriteFile(filepath.Join(name, "src", "main.vine"), []byte("print('Hello, World!')"), os.ModePerm)
 	os.WriteFile(filepath.Join(name, "vine.project.yml"), []byte(fmt.Sprintf(
 		`name: %s
-version: 0.0.0
+version: %s
 main: src/main.vine
 author: vine
-`, name)), os.ModePerm)
+`, name, version)), os.ModePerm)
 	return nil
 }
