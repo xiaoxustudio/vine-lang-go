@@ -314,6 +314,16 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			IsTask:   false,
 		})
 		return nil, nil
+	case *ast.LambdaFunctionDecl:
+		return &types.FunctionLikeValNode{
+			IsLamda:  true,
+			IsModule: false,
+			IsInside: false,
+			Token:    &token.Token{},
+			Args:     &n.Args,
+			Body:     &n.Body,
+			IsTask:   false,
+		}, nil
 	case *ast.ReturnStmt:
 		return i.Eval(n.Value, env)
 	case *ast.SwitchStmt:
@@ -408,6 +418,35 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 					theTaskTo = theTaskTo.Next
 				}
 				return res
+			}).Catch(func(catchErr any) any {
+				currentCatchStmt := n.Catch
+				if currentCatchStmt == nil {
+					return nil
+				}
+				newEnv := environment.New(env.WorkSpace)
+				newEnv.Link(env)
+				currentCatchStmtArgs := currentCatchStmt.Args.Arguments
+				catchErr, ok = catchErr.(verror.InterpreterVError)
+				if !ok {
+					return catchErr
+				}
+				if len(currentCatchStmtArgs) > 0 {
+					newEnv.Define(*currentCatchStmtArgs[0].(*ast.Literal).Value, catchErr)
+				}
+				r, err := i.Eval(n.Catch, newEnv)
+				if err != nil {
+					return err
+				}
+				TaskCatch, ok := r.(*types.FunctionLikeValNode)
+				if !ok {
+					return nil
+				}
+				// 执行catch 函数
+				r, err = i.Eval(TaskCatch.Body, newEnv)
+				if err != nil {
+					return err
+				}
+				return r
 			}).Run()
 			return nil, nil
 		}

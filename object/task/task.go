@@ -16,18 +16,22 @@ var (
 )
 
 type TaskObject struct {
-	parent *TaskObject
-	next   *TaskObject
-	state  TaskObjectStatus
-	wg     sync.WaitGroup
-	fn     func(args ...[]any) any
-	result any
+	parent  *TaskObject
+	next    *TaskObject
+	state   TaskObjectStatus
+	wg      sync.WaitGroup
+	fn      func(args ...[]any) any
+	catchFn func(err any) any
+	result  any
 }
 
 func NewTaskObject(fn func(args ...[]any) any) *TaskObject {
 	instance := &TaskObject{
 		state: TaskStateReady,
 		fn:    fn,
+		catchFn: func(err any) any {
+			return nil
+		},
 	}
 	mu.Lock()
 	GlobalTaskArray = append(GlobalTaskArray, instance)
@@ -60,9 +64,19 @@ func (t *TaskObject) Run(args ...[]any) {
 	t.state = TaskStateRunning
 
 	t.wg.Go(func() {
+		defer func() {
+			if err := recover(); err != nil {
+				t.result = t.catchFn(err)
+			}
+		}()
 		t.result = t.fn(args...)
 		t.Done()
 	})
+}
+
+func (t *TaskObject) Catch(fn func(err any) any) *TaskObject {
+	t.catchFn = fn
+	return t
 }
 
 func (t *TaskObject) Next(fn func(args ...[]any) any) *TaskObject {

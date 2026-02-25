@@ -296,7 +296,7 @@ func (p *Parser) parseCallExpression() ast.Expr {
 		var parentToStmt = &ast.ToExpr{Next: nil}
 		var currentToStmt = parentToStmt
 		if p.peek().Type == token.TO {
-			for p.peek().Type == token.TO {
+			for p.peek().Type == token.TO || p.peek().Type != token.CATCH {
 				p.advance()
 				toStmt := &ast.ToExpr{}
 				if p.peek().Type == token.LPAREN {
@@ -307,7 +307,7 @@ func (p *Parser) parseCallExpression() ast.Expr {
 				}
 				p.expect(token.COLON)
 				var block = &ast.BlockStmt{Body: []ast.Stmt{}}
-				for !slices.Contains([]token.TokenType{token.TO, token.END}, p.peek().Type) && !p.isEof() {
+				for !slices.Contains([]token.TokenType{token.TO, token.END, token.CATCH}, p.peek().Type) && !p.isEof() {
 					stmt := p.parseStatement()
 					if stmt != nil {
 						block.Body = append(block.Body, stmt)
@@ -319,6 +319,23 @@ func (p *Parser) parseCallExpression() ast.Expr {
 					currentToStmt = toStmt
 				}
 			}
+			var catchStmt = &ast.LambdaFunctionDecl{Body: ast.BlockStmt{}}
+			if p.peek().Type == token.CATCH {
+				p.advance()
+				p.expect(token.LPAREN)
+				args := p.parseArgs()
+				p.expect(token.RPAREN)
+				p.expect(token.COLON)
+				var blockStmt = &ast.BlockStmt{Body: []ast.Stmt{}}
+				for !p.isEof() && p.peek().Type != token.END {
+					stmt := p.parseStatement()
+					if stmt != nil {
+						blockStmt.Body = append(blockStmt.Body, stmt)
+					}
+				}
+				catchStmt = &ast.LambdaFunctionDecl{Args: *args, Body: *blockStmt}
+			}
+
 			p.expect(token.END)
 
 			target, ok := left.(*ast.CallExpr)
@@ -329,11 +346,24 @@ func (p *Parser) parseCallExpression() ast.Expr {
 			return &ast.CallTaskFn{
 				Target: *target,
 				To:     *parentToStmt.Next,
+				Catch:  catchStmt,
 			}
 		}
 	}
 
 	return left
+}
+
+func (p *Parser) parseLambda() *ast.LambdaFunctionDecl {
+	if p.isEof() {
+		return nil
+	}
+	p.expect(token.FN)
+	p.expect(token.LPAREN)
+	args := p.parseArgs()
+	p.expect(token.RPAREN)
+	body := p.parseBlockStatement()
+	return &ast.LambdaFunctionDecl{Args: *args, Body: *body}
 }
 
 func (p *Parser) parsePropertyExpression() []*ast.Property {
@@ -480,8 +510,10 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 		return &ast.UnaryExpr{Operator: op, Value: right, IsSuffix: false}
 	case token.WAIT:
 		return p.CallStmtHandler(token.WAIT)
+	case token.FN:
+		return p.parseLambda()
 	default:
-		p.errorf(tk, "unexpected token: %s", tk.String())
+		p.errorf(tk, "primary unexpected token: %s", tk.String())
 		return nil
 	}
 }

@@ -168,8 +168,12 @@ type FunctionDecl struct {
 // LambdaFunctionDecl
 type LambdaFunctionDecl struct {
 	BaseNode
-	Arguments []Expr
-	Body      *BlockStmt
+	Args ArgsExpr
+	Body BlockStmt
+}
+
+func (l *LambdaFunctionDecl) String() string {
+	return fmt.Sprintf("LambdaFunctionDecl(%s, %s)", l.Args.String(), l.Body.String())
 }
 
 // VariableDecl
@@ -498,10 +502,14 @@ type CallTaskFn struct {
 	BaseNode
 	Target CallExpr
 	To     ToExpr
+	Catch  *LambdaFunctionDecl
 }
 
 func (c *CallTaskFn) String() string {
-	return fmt.Sprintf("CallTaskFn(%v, %v)", c.Target.String(), c.To.String())
+	if c.Catch == nil {
+		return fmt.Sprintf("CallTaskFn(%v, %v)", c.Target.String(), c.To.String())
+	}
+	return fmt.Sprintf("CallTaskFn(%v, %v, %v)", c.Target.String(), c.To.String(), c.Catch.String())
 }
 
 type ToExpr struct {

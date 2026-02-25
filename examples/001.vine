@@ -32,5 +32,7 @@ call()
     to (res2):
         res2 + 2
     to ():
-        print("最后的运行")
+        print123("最后的运行")
+    catch (e):
+        print("发生错误：",e)
 end
