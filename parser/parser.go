@@ -359,9 +359,12 @@ func (p *Parser) parseLambda() *ast.LambdaFunctionDecl {
 		return nil
 	}
 	p.expect(token.FN)
-	p.expect(token.LPAREN)
-	args := p.parseArgs()
-	p.expect(token.RPAREN)
+	var args = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+	if p.peek().Type == token.LPAREN {
+		p.expect(token.LPAREN)
+		args = p.parseArgs()
+		p.expect(token.RPAREN)
+	}
 	body := p.parseBlockStatement()
 	return &ast.LambdaFunctionDecl{Args: *args, Body: *body}
 }

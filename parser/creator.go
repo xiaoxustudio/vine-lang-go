@@ -180,8 +180,12 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 	c.RegisterStmtHandler(token.FN, func(p *Parser) any {
 		p.advance() // skip 'fn'
 		id := p.expect(token.IDENT)
-		p.expect(token.LPAREN)
-		args := p.parseArgs()
+		var args = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+		if p.peek().Type == token.LPAREN {
+			p.expect(token.LPAREN)
+			args = p.parseArgs()
+			p.expect(token.RPAREN)
+		}
 		return &ast.FunctionDecl{
 			ID:        p.createLiteral(id),
 			Arguments: args,
