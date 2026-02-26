@@ -14,6 +14,7 @@ type VError interface {
 	error
 	GetPosition() Position
 	Error() string
+	Return()
 }
 
 type LexerVError struct {

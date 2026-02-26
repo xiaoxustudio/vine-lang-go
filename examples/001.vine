@@ -20,19 +20,19 @@ task fn call:
     return 123
 end
 
-b(123)
-print("开始执行脚本")
-a()
-c()
+# b(123)
+# print("开始执行脚本")
+# a()
+# c()
 
-# call() 
-#     to (res):
-#         print("call函数的执行结果：", res)
-#         res
-#     to (res2):
-#         res2 + 2
-#     to ():
-#         print123("最后的运行")
-#     catch (e):
-#         print("发生错误：",e)
-# end
+call()
+    to (res):
+        print("call函数的执行结果：", res)
+        res
+    to (res2):
+        res2 + 2
+    to ():
+        print123("最后的运行")
+    catch (e):
+        print("发生错误：",e.Type())
+end

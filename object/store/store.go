@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"vine-lang/token"
 	LibsUtils "vine-lang/utils"
@@ -21,6 +22,61 @@ func NewStoreObject() *StoreObject {
 		nameMap: make(map[string]token.Token),
 		parent:  nil,
 	}
+}
+
+func NewStoreObjectWithGoStruct(val any) *StoreObject {
+	t := reflect.TypeOf(val)
+	v := reflect.ValueOf(val)
+
+	var store = make(map[token.Token]any)
+
+	originalType := t
+
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+		v = v.Elem()
+	}
+
+	// 遍历字段
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldValue := v.Field(i)
+		if fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() {
+			NewStoreObjectWithGoStruct(fieldValue.Interface())
+		} else if fieldValue.Kind() == reflect.Struct {
+			NewStoreObjectWithGoStruct(fieldValue.Interface())
+		} else {
+			store[token.Token{Type: token.IDENT, Value: field.Name}] = fieldValue.Interface()
+		}
+	}
+	methodType := originalType
+	// 遍历方法
+	for i := 0; i < methodType.NumMethod(); i++ {
+		method := methodType.Method(i)
+		store[token.Token{Type: token.IDENT, Value: method.Name}] = func(_ ...any) any {
+			mType := method.Func.Type()
+			numIn := mType.NumIn()
+			args := make([]reflect.Value, numIn)
+			for i := range numIn {
+				pt := mType.In(i)
+				if pt.Kind() == reflect.Pointer {
+					args[i] = reflect.New(pt.Elem()).Elem().Addr()
+				} else {
+					args[i] = reflect.Zero(pt)
+				}
+			}
+			results := method.Func.Call(args)
+			return results[0]
+		}
+	}
+
+	s := &StoreObject{
+		store:   store,
+		nameMap: LibsUtils.MapKeysToToken(store),
+		parent:  nil,
+	}
+
+	return s
 }
 
 func StoreObjectToMap(e *StoreObject) map[string]any {

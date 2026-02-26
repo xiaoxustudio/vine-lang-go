@@ -1,9 +1,11 @@
 package types
 
 import (
+	"fmt"
 	"reflect"
 	"vine-lang/ast"
 	"vine-lang/token"
+	"vine-lang/verror"
 )
 
 type ValNodeType int
@@ -108,4 +110,45 @@ func (v *TaskToValNode) Env(env any) any {
 	}
 	v.env = env
 	return v.env
+}
+
+type ErrorValNodeType int
+
+const (
+	ERR_Unknown ErrorValNodeType = iota
+	ERR_Lexer   ErrorValNodeType = iota
+	ERR_Parser  ErrorValNodeType = iota
+	ERR_Runtime ErrorValNodeType = iota
+	ERR_Synax   ErrorValNodeType = iota
+) // 错误类型
+
+type ErrorValNode struct {
+	Val
+	Err any
+}
+
+func CreateErrorValNode(err any) *ErrorValNode {
+	return &ErrorValNode{
+		Err: err,
+	}
+}
+
+func (ev *ErrorValNode) Type() ErrorValNodeType {
+	if ev.Err == nil {
+		return ERR_Unknown
+	}
+	switch ev.Err.(type) {
+	case verror.InterpreterVError:
+		return ERR_Runtime
+	case verror.ParseVError:
+		return ERR_Parser
+	case verror.LexerVError:
+		return ERR_Lexer
+	default:
+		return ERR_Synax
+	}
+}
+
+func (ev *ErrorValNode) String() string {
+	return fmt.Sprintf("<ERROR %v>", &ev)
 }

@@ -430,8 +430,10 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 				if !ok {
 					return catchErr
 				}
+				// 包装错误值
+				catchErrWrapper := types.CreateErrorValNode(catchErr)
 				if len(currentCatchStmtArgs) > 0 {
-					newEnv.Define(*currentCatchStmtArgs[0].(*ast.Literal).Value, catchErr)
+					newEnv.Define(*currentCatchStmtArgs[0].(*ast.Literal).Value, catchErrWrapper)
 				}
 				r, err := i.Eval(n.Catch, newEnv)
 				if err != nil {
@@ -639,7 +641,13 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 					return nil, i.Errorf(token.Token{}, "index must be an integer")
 				}
 			}
+		}
 
+		// 强制转换对象为 StoreObject
+		m := store.NewStoreObjectWithGoStruct(obj)
+
+		if v, ok := m.Get(prop.(token.Token)); ok {
+			return v, nil
 		}
 
 		return nil, i.Errorf(token.Token{}, fmt.Sprintf("property %s not found", prop))
