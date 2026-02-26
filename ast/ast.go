@@ -13,49 +13,6 @@ type Token = token.Token
 // NodeType 定义所有 AST 节点的类型
 type NodeType string
 
-const (
-	NodeProgram          NodeType = "Program"
-	NodeLiteral          NodeType = "Literal"
-	NodeProperty         NodeType = "Property"
-	NodeCommentStatement NodeType = "CommentStatement"
-	NodeEmptyLine        NodeType = "EmptyLine"
-	/* Declaration */
-	NodeLambdaFunctionDecl  NodeType = "LambdaFunctionDecl"
-	NodeFunctionDeclaration NodeType = "FunctionDeclaration"
-	NodeVariableDeclaration NodeType = "VariableDeclaration"
-	NodeUseDeclaration      NodeType = "UseDeclaration"
-	NodeUseSpecifier        NodeType = "UseSpecifier"
-	NodeUseDefaultSpecifier NodeType = "UseDefaultSpecifier"
-	NodeTemplateElement     NodeType = "TemplateElement"
-	/* expr */
-	NodeBinaryExpression     NodeType = "BinaryExpression"
-	NodeArrayExpression      NodeType = "ArrayExpression"
-	NodeObjectExpression     NodeType = "ObjectExpression"
-	NodeMemberExpression     NodeType = "MemberExpression"
-	NodeCallExpression       NodeType = "CallExpression"
-	NodeAssignmentExpression NodeType = "AssignmentExpression"
-	NodeCompareExpression    NodeType = "CompareExpression"
-	NodeEqualExpression      NodeType = "EqualExpression"
-	NodeTernayExpression     NodeType = "TernayExpression"
-	NodeRangeExpression      NodeType = "RangeExpression"
-	NodeIterableExpression   NodeType = "IterableExpression"
-	NodeToExpression         NodeType = "ToExpression"
-	NodeTemplateLiteral      NodeType = "TemplateLiteralExpression"
-	/* stmt */
-	NodeRunStatement        NodeType = "RunStatement"
-	NodeWaitStatement       NodeType = "WaitStatement"
-	NodeTaskStatement       NodeType = "TaskStatement"
-	NodeBlockStatement      NodeType = "BlockStatement"
-	NodeReturnStatement     NodeType = "ReturnStatement"
-	NodeExpressionStatement NodeType = "ExpressionStatement"
-	NodeIfStatement         NodeType = "IfStatement"
-	NodeForStatement        NodeType = "ForStatement"
-	NodeSwitchStmtement     NodeType = "SwitchStmtement"
-	NodeCaseBlockStatement  NodeType = "CaseBlockStatement"
-	NodeDefaultCaseBlock    NodeType = "DefaultCaseBlockStatement"
-	NodeExposeStmtement     NodeType = "ExposeStmtement"
-)
-
 // ================================== Base Interfaces & Structs ==================================
 
 // Node 所有节点的基础接口
