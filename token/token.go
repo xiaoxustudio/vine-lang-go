@@ -12,7 +12,7 @@ type TokenType string
 const (
 	EOF TokenType = "EOF"
 
-	NEWLINE    TokenType = "\n"
+	NEWLINE    TokenType = "NEWLINE"
 	WHITESPACE TokenType = "WHITESPACE"
 	ILLEGAL    TokenType = "ILLEGAL"
 	COMMENT    TokenType = "COMMENT"

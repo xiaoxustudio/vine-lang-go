@@ -144,8 +144,10 @@ func (p *Parser) ParseProgram() *ast.ProgramStmt {
 	p.ast.Body = []ast.Stmt{}
 
 	for !p.isEof() {
-		stmt := p.parseStatement()
-		if stmt != nil {
+		if p.peek().Type == token.EOF {
+			break
+		}
+		if stmt := p.parseStatement(); stmt != nil {
 			p.ast.Body = append(p.ast.Body, stmt)
 		}
 	}
