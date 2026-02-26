@@ -24,7 +24,7 @@ func New(lex *lexer.Lexer) *Parser {
 	p := &Parser{lexer: lex, tokens: []Token{}, position: 0, errors: []verror.ParseVError{}, handlers: make(map[token.TokenType][]func(p *Parser) any)}
 	// 移除不进行解析的token
 	for _, tk := range lex.Tokens() {
-		if slices.Contains([]token.TokenType{token.WHITESPACE, token.NEWLINE}, tk.Type) {
+		if slices.Contains([]token.TokenType{token.WHITESPACE}, tk.Type) {
 			continue
 		}
 		p.tokens = append(p.tokens, tk)
@@ -70,6 +70,10 @@ func (p *Parser) peek() Token {
 		return p.lexer.TheEof()
 	}
 	return p.tokens[p.position]
+}
+
+func (p *Parser) peekTokenIs(t token.TokenType) bool {
+	return p.peek().Type == t
 }
 
 func (p *Parser) peekIndex(index int) Token {
@@ -167,6 +171,11 @@ func (p *Parser) parseStatement() ast.Stmt {
 				break
 			}
 		}
+	}
+
+	if p.peekTokenIs(token.NEWLINE) || p.peekTokenIs(token.SEMICOLON) {
+		p.advance()
+		return nil
 	}
 
 	return p.parseExpressionStatement()
@@ -295,6 +304,12 @@ func (p *Parser) parseCallExpression() ast.Expr {
 		args := p.parseArgs()
 		p.expect(token.RPAREN)
 		left = &ast.CallExpr{Callee: left, Args: *args}
+
+		// 可能是换行
+		if p.peek().Type == token.NEWLINE {
+			p.advance()
+		}
+
 		var parentToStmt = &ast.ToExpr{Next: nil}
 		var currentToStmt = parentToStmt
 		if p.peek().Type == token.TO {
