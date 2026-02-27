@@ -118,17 +118,18 @@ func (e *Environment) Set(name Token, val any) {
 	}
 }
 
-func (e *Environment) Define(name Token, val any) {
+func (e *Environment) Define(name Token, val any) error {
 	_, tk := e.Lookup(name)
 	if !tk.IsEmpty() {
-		panic(verror.InterpreterVError{
+		return verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
 			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
-		})
+		}
 	} else {
 		e.store[name] = val
 		e.nameMap[name.Value] = name
 	}
+	return nil
 }
 
 // 定义临时参数
