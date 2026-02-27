@@ -8,19 +8,54 @@ import (
 
 type Token = token.Token
 
-// ================================== Node Type Definitions ==================================
+type NodeType uint16
 
-// NodeType 定义所有 AST 节点的类型
-type NodeType string
+const (
+	NodeTypeProgramStmt NodeType = iota
+	NodeTypeBlockStmt
+	NodeTypeUseDecl
+	NodeTypeExpressionStmt
+	NodeTypeVariableDecl
+	NodeTypeExposeStmt
+	NodeTypeForStmt
+	NodeTypeIfStmt
+	NodeTypeFunctionDecl
+	NodeTypeLambdaFunctionDecl
+	NodeTypeReturnStmt
+	NodeTypeSwitchStmt
+	NodeTypeTaskStmt
+	NodeTypeWaitStmt
+	NodeTypeCallTaskFn
+	NodeTypeToExpr
+	NodeTypeAssignmentExpr
+	NodeTypeCompareExpr
+	NodeTypeBinaryExpr
+	NodeTypeProperty
+	NodeTypeArrayExpr
+	NodeTypeObjectExpr
+	NodeTypeMemberExpr
+	NodeTypeArgsExpr
+	NodeTypeCallExpr
+	NodeTypeUnaryExpr
+	NodeTypeLiteral
+	NodeTypeUseSpecifier
+	NodeTypeSwitchCase
 
-// ================================== Base Interfaces & Structs ==================================
+	NodeTypeCommentStmt
+	NodeTypeBaseNode
+)
 
-// Node 所有节点的基础接口
-type Node interface {
-	GetType() NodeType
+type Node any
+
+type BaseNode struct {
+	Type  NodeType
+	Token *token.Token
 }
 
-// Expr 表达式接口
+func (n *BaseNode) String() string {
+	return n.Token.Value
+}
+
 type Expr interface {
 	Node
 	String() string
@@ -30,20 +65,6 @@ type Expr interface {
 type Stmt interface {
 	Node
 	String() string
-}
-
-// BaseNode 基础节点实现
-type BaseNode struct {
-	Type NodeType
-	ID   *Token
-}
-
-func (n *BaseNode) GetType() NodeType {
-	return n.Type
-}
-
-func (n *BaseNode) String() string {
-	return n.ID.Value
 }
 
 // ================================== Helper Interfaces for Unions ==================================
@@ -60,6 +81,13 @@ type Literal struct {
 	Value *Token
 }
 
+func NewLiteral(value *Token) *Literal {
+	return &Literal{
+		BaseNode: BaseNode{Type: NodeTypeLiteral},
+		Value:    value,
+	}
+}
+
 func (l *Literal) String() string {
 	return fmt.Sprintf("Literal(%s)", l.Value.String())
 }
@@ -70,22 +98,37 @@ type Property struct {
 	Value Expr
 }
 
+func NewProperty(key *Literal, value Expr) *Property {
+	return &Property{
+		BaseNode: BaseNode{Type: NodeTypeProperty},
+		Key:      key,
+		Value:    value,
+	}
+}
+
 func (p *Property) String() string {
 	return fmt.Sprintf("%s: %s", p.Key.String(), p.Value.String())
 }
 
-type TemplateElement struct {
-	BaseNode
-	Value *Literal
-}
+// type TemplateElement struct {
+// 	BaseNode
+// 	Value *Literal
+// }
 
-type EmptyLineStmt struct {
-	BaseNode
-}
+// type EmptyLineStmt struct {
+// 	BaseNode
+// }
 
 type CommentStmt struct {
 	BaseNode
 	Value Token
+}
+
+func NewCommentStmt(value Token) *CommentStmt {
+	return &CommentStmt{
+		BaseNode: BaseNode{Type: NodeTypeCommentStmt},
+		Value:    value,
+	}
 }
 
 func (l *CommentStmt) String() string {
@@ -101,12 +144,33 @@ type UseSpecifier struct {
 	Local  *Literal
 }
 
+func NewUseSpecifier(remote, local *Literal) *UseSpecifier {
+	return &UseSpecifier{
+		BaseNode: BaseNode{Type: NodeTypeUseSpecifier},
+		Remote:   remote,
+		Local:    local,
+	}
+}
+
+func (u *UseSpecifier) String() string {
+	return fmt.Sprintf("UseSpecifier(%s, %s)", u.Remote.String(), u.Local.String())
+}
+
 // UseDecl
 type UseDecl struct {
 	BaseNode
 	Source     *Literal
 	Specifiers []Specifier
 	Mode       token.TokenType
+}
+
+func NewUseDecl(source *Literal, specifiers []Specifier, mode token.TokenType) *UseDecl {
+	return &UseDecl{
+		BaseNode:   BaseNode{Type: NodeTypeUseDecl},
+		Source:     source,
+		Specifiers: specifiers,
+		Mode:       mode,
+	}
 }
 
 func (u *UseDecl) String() string {
@@ -122,11 +186,33 @@ type FunctionDecl struct {
 	Body      *BlockStmt
 }
 
+func NewFunctionDecl(preID Token, id *Literal, args *ArgsExpr, body *BlockStmt) *FunctionDecl {
+	return &FunctionDecl{
+		BaseNode:  BaseNode{Type: NodeTypeFunctionDecl},
+		PreID:     preID,
+		ID:        id,
+		Arguments: args,
+		Body:      body,
+	}
+}
+
+func (f *FunctionDecl) String() string {
+	return fmt.Sprintf("FunctionDecl(%s, %s, %s)", f.PreID.String(), f.ID.String(), f.Body.String())
+}
+
 // LambdaFunctionDecl
 type LambdaFunctionDecl struct {
 	BaseNode
 	Args ArgsExpr
 	Body BlockStmt
+}
+
+func NewLambdaFunctionDecl(args ArgsExpr, body BlockStmt) *LambdaFunctionDecl {
+	return &LambdaFunctionDecl{
+		BaseNode: BaseNode{Type: NodeTypeLambdaFunctionDecl},
+		Args:     args,
+		Body:     body,
+	}
 }
 
 func (l *LambdaFunctionDecl) String() string {
@@ -141,6 +227,15 @@ type VariableDecl struct {
 	IsConst bool
 }
 
+func NewVariableDecl(name Literal, value Expr, isConst bool) *VariableDecl {
+	return &VariableDecl{
+		BaseNode: BaseNode{Type: NodeTypeVariableDecl},
+		Name:     name,
+		Value:    value,
+		IsConst:  isConst,
+	}
+}
+
 func (v *VariableDecl) String() string {
 	var prefix string
 	if v.IsConst {
@@ -153,13 +248,13 @@ func (v *VariableDecl) String() string {
 
 // ================================== Expressions ==================================
 
-// RangeExpr
-type RangeExpr struct {
-	BaseNode
-	Start Expr
-	End   Expr
-	Step  Token
-}
+// // RangeExpr
+// type RangeExpr struct {
+// 	BaseNode
+// 	Start Expr
+// 	End   Expr
+// 	Step  Token
+// }
 
 // UnaryExpr
 type UnaryExpr struct {
@@ -167,6 +262,15 @@ type UnaryExpr struct {
 	Value    Expr
 	Operator Token
 	IsSuffix bool // 后缀运算符
+}
+
+func NewUnaryExpr(value Expr, operator Token, isSuffix bool) *UnaryExpr {
+	return &UnaryExpr{
+		BaseNode: BaseNode{Type: NodeTypeUnaryExpr},
+		Value:    value,
+		Operator: operator,
+		IsSuffix: isSuffix,
+	}
 }
 
 func (u *UnaryExpr) String() string {
@@ -184,6 +288,15 @@ type CompareExpr struct {
 	Operator Token
 }
 
+func NewCompareExpr(left, right Expr, operator Token) *CompareExpr {
+	return &CompareExpr{
+		BaseNode: BaseNode{Type: NodeTypeCompareExpr},
+		Left:     left,
+		Right:    right,
+		Operator: operator,
+	}
+}
+
 func (ce *CompareExpr) String() string {
 	return fmt.Sprintf("CompareExpr(%s %s %s)", ce.Left.String(), ce.Operator.String(), ce.Right.String())
 }
@@ -192,6 +305,13 @@ func (ce *CompareExpr) String() string {
 type ArgsExpr struct {
 	BaseNode
 	Arguments []Expr
+}
+
+func NewArgsExpr(args []Expr) *ArgsExpr {
+	return &ArgsExpr{
+		BaseNode:  BaseNode{Type: NodeTypeArgsExpr},
+		Arguments: args,
+	}
 }
 
 func (a *ArgsExpr) GetType() NodeType {
@@ -213,6 +333,14 @@ type CallExpr struct {
 	Args   ArgsExpr
 }
 
+func NewCallExpr(callee Expr, args ArgsExpr) *CallExpr {
+	return &CallExpr{
+		BaseNode: BaseNode{Type: NodeTypeCallExpr},
+		Callee:   callee,
+		Args:     args,
+	}
+}
+
 func (c *CallExpr) GetType() NodeType {
 	return c.Type
 }
@@ -227,22 +355,38 @@ type AssignmentExpr struct {
 	Operator Token
 }
 
+func NewAssignmentExpr(left, right Expr, operator Token) *AssignmentExpr {
+	return &AssignmentExpr{
+		BaseNode: BaseNode{Type: NodeTypeAssignmentExpr},
+		Left:     left,
+		Right:    right,
+		Operator: operator,
+	}
+}
+
 func (a *AssignmentExpr) String() string {
 	return fmt.Sprintf("AssignmentExpr(%s %s %s)", a.Left.String(), a.Operator.String(), a.Right.String())
 }
 
-// TernaryExpr (Type: TernayExpression)
-type TernaryExpr struct {
-	BaseNode
-	Condition  Expr
-	Consequent Expr
-	Alternate  Expr
-}
+// // TernaryExpr (Type: TernayExpression)
+// type TernaryExpr struct {
+// 	BaseNode
+// 	Condition  Expr
+// 	Consequent Expr
+// 	Alternate  Expr
+// }
 
 // ObjectExpr
 type ObjectExpr struct {
 	BaseNode
 	Properties []*Property
+}
+
+func NewObjectExpr(properties []*Property) *ObjectExpr {
+	return &ObjectExpr{
+		BaseNode:   BaseNode{Type: NodeTypeObjectExpr},
+		Properties: properties,
+	}
 }
 
 func (o *ObjectExpr) String() string {
@@ -257,6 +401,13 @@ func (o *ObjectExpr) String() string {
 type ArrayExpr struct {
 	BaseNode
 	Items []*Property
+}
+
+func NewArrayExpr(items []*Property) *ArrayExpr {
+	return &ArrayExpr{
+		BaseNode: BaseNode{Type: NodeTypeArrayExpr},
+		Items:    items,
+	}
 }
 
 func (arr *ArrayExpr) String() string {
@@ -275,6 +426,15 @@ type MemberExpr struct {
 	Computed bool // 是否为计算属性 xxx[xxx]
 }
 
+func NewMemberExpr(object, property Expr, computed bool) *MemberExpr {
+	return &MemberExpr{
+		BaseNode: BaseNode{Type: NodeTypeMemberExpr},
+		Object:   object,
+		Property: property,
+		Computed: computed,
+	}
+}
+
 func (m *MemberExpr) String() string {
 	if m.Computed {
 		return fmt.Sprintf("*MemberExpr(%s.%s)", m.Object.String(), m.Property.String())
@@ -290,21 +450,30 @@ type BinaryExpr struct {
 	Operator Token
 }
 
+func NewBinaryExpr(left, right Expr, operator Token) *BinaryExpr {
+	return &BinaryExpr{
+		BaseNode: BaseNode{Type: NodeTypeBinaryExpr},
+		Left:     left,
+		Right:    right,
+		Operator: operator,
+	}
+}
+
 func (b *BinaryExpr) String() string {
 	return fmt.Sprintf("BinaryExpr(%s %s %s)", b.Left.String(), b.Operator.String(), b.Right.String())
 }
 
-// TemplateLiteralExpr
-type TemplateLiteralExpr struct {
-	BaseNode
-	Quotes []Node // TemplateElement | Expr
-}
+// // TemplateLiteralExpr
+// type TemplateLiteralExpr struct {
+// 	BaseNode
+// 	Quotes []Node // TemplateElement | Expr
+// }
 
-// IterableExpr (在 NodeType 中存在但未定义接口，补充定义)
-type IterableExpr struct {
-	BaseNode
-	// 根据实际语法补充字段
-}
+// // IterableExpr (在 NodeType 中存在但未定义接口，补充定义)
+// type IterableExpr struct {
+// 	BaseNode
+// 	// 根据实际语法补充字段
+// }
 
 // ================================== Statements ==================================
 
@@ -316,10 +485,30 @@ type ExposeStmt struct {
 	Value Expr
 }
 
+func NewExposeStmt(decl Stmt, name *Literal, value Expr) *ExposeStmt {
+	return &ExposeStmt{
+		BaseNode: BaseNode{Type: NodeTypeExposeStmt},
+		Decl:     decl,
+		Name:     name,
+		Value:    value,
+	}
+}
+
+func (e *ExposeStmt) String() string {
+	return fmt.Sprintf("ExposeStmt(%s, %s, %s)", e.Decl.String(), e.Name.String(), e.Value.String())
+}
+
 // BlockStmt
 type BlockStmt struct {
 	BaseNode
 	Body []Stmt
+}
+
+func NewBlockStmt(body []Stmt) *BlockStmt {
+	return &BlockStmt{
+		BaseNode: BaseNode{Type: NodeTypeBlockStmt},
+		Body:     body,
+	}
 }
 
 func (b *BlockStmt) String() string {
@@ -330,32 +519,17 @@ func (b *BlockStmt) String() string {
 	return fmt.Sprintf("BlockStmt(%s)", strings.Join(body, ", "))
 }
 
-// CaseBlockStmt
-type CaseBlockStmt struct {
-	BaseNode
-	Body BlockStmt
-	Test Expr
-}
-
-func (b *CaseBlockStmt) String() string {
-	return fmt.Sprintf("CaseBlockStmt(%s, %s)", b.Test.String(), b.Body.String())
-}
-
-// DefaultCaseBlockStmt
-type DefaultCaseBlockStmt struct {
-	BaseNode
-	Body BlockStmt
-	Test Expr
-}
-
-func (b *DefaultCaseBlockStmt) String() string {
-	return fmt.Sprintf("DefaultCaseBlockStmt(%s, %s)", b.Test.String(), b.Body.String())
-}
-
 // ReturnStmt
 type ReturnStmt struct {
 	BaseNode
 	Value Expr
+}
+
+func NewReturnStmt(value Expr) *ReturnStmt {
+	return &ReturnStmt{
+		BaseNode: BaseNode{Type: NodeTypeReturnStmt},
+		Value:    value,
+	}
 }
 
 func (r *ReturnStmt) String() string {
@@ -366,6 +540,13 @@ func (r *ReturnStmt) String() string {
 type ProgramStmt struct {
 	BaseNode
 	Body []Stmt
+}
+
+func NewProgramStmt(body []Stmt) *ProgramStmt {
+	return &ProgramStmt{
+		BaseNode: BaseNode{Type: NodeTypeProgramStmt},
+		Body:     body,
+	}
 }
 
 func (p *ProgramStmt) Print() {
@@ -385,6 +566,15 @@ type IfStmt struct {
 	Alternate  Stmt // 可选
 }
 
+func NewIfStmt(test Expr, consequent *BlockStmt, alternate Stmt) *IfStmt {
+	return &IfStmt{
+		BaseNode:   BaseNode{Type: NodeTypeIfStmt},
+		Test:       test,
+		Consequent: consequent,
+		Alternate:  alternate,
+	}
+}
+
 func (ifs *IfStmt) String() string {
 	return fmt.Sprintf("IfStmt(%s, %s, %s)", ifs.Test.String(), ifs.Consequent.String(), ifs.Alternate.String())
 }
@@ -399,6 +589,17 @@ type ForStmt struct {
 	Body   BlockStmt
 }
 
+func NewForStmt(init, value, update, range_ Expr, body BlockStmt) *ForStmt {
+	return &ForStmt{
+		BaseNode: BaseNode{Type: NodeTypeForStmt},
+		Init:     init,
+		Value:    value,
+		Update:   update,
+		Range:    range_,
+		Body:     body,
+	}
+}
+
 func (ifs *ForStmt) String() string {
 	return fmt.Sprintf("ForStmt(%s, %s, %s, %s, %s)", ifs.Init.String(), ifs.Value.String(), ifs.Update.String(), ifs.Range, ifs.Body.String())
 }
@@ -408,6 +609,15 @@ type SwitchCase struct {
 	Conds     []Expr
 	Body      *BlockStmt
 	IsDefault bool // 是否为默认情况
+}
+
+func NewSwitchCase(conds []Expr, body *BlockStmt, isDefault bool) *SwitchCase {
+	return &SwitchCase{
+		BaseNode:  BaseNode{Type: NodeTypeSwitchCase},
+		Conds:     conds,
+		Body:      body,
+		IsDefault: isDefault,
+	}
 }
 
 func (s *SwitchCase) String() string {
@@ -425,10 +635,33 @@ type SwitchStmt struct {
 	Cases []Expr
 }
 
+func NewSwitchStmt(test Expr, cases []Expr) *SwitchStmt {
+	return &SwitchStmt{
+		BaseNode: BaseNode{Type: NodeTypeSwitchStmt},
+		Test:     test,
+		Cases:    cases,
+	}
+}
+
+func (s *SwitchStmt) String() string {
+	var cases = make([]string, len(s.Cases))
+	for i, case_ := range s.Cases {
+		cases[i] = case_.String()
+	}
+	return fmt.Sprintf("SwitchStmt(%s, %s)", s.Test.String(), cases)
+}
+
 // ExpressionStmt
 type ExpressionStmt struct {
 	BaseNode
 	Expression Expr
+}
+
+func NewExpressionStmt(expr Expr) *ExpressionStmt {
+	return &ExpressionStmt{
+		BaseNode:   BaseNode{Type: NodeTypeExpressionStmt},
+		Expression: expr,
+	}
 }
 
 func (e *ExpressionStmt) String() string {
@@ -441,6 +674,13 @@ type TaskStmt struct {
 	Fn FunctionDecl
 }
 
+func NewTaskStmt(fn FunctionDecl) *TaskStmt {
+	return &TaskStmt{
+		BaseNode: BaseNode{Type: NodeTypeTaskStmt},
+		Fn:       fn,
+	}
+}
+
 func (task *TaskStmt) String() string {
 	return fmt.Sprintf("TaskStmt(%v)", task.Fn)
 }
@@ -449,6 +689,13 @@ func (task *TaskStmt) String() string {
 type WaitStmt struct {
 	BaseNode
 	Async Expr
+}
+
+func NewWaitStmt(async Expr) *WaitStmt {
+	return &WaitStmt{
+		BaseNode: BaseNode{Type: NodeTypeWaitStmt},
+		Async:    async,
+	}
 }
 
 func (wait *WaitStmt) String() string {
@@ -460,6 +707,15 @@ type CallTaskFn struct {
 	Target CallExpr
 	To     ToExpr
 	Catch  *LambdaFunctionDecl
+}
+
+func NewCallTaskFn(target CallExpr, to ToExpr, catch *LambdaFunctionDecl) *CallTaskFn {
+	return &CallTaskFn{
+		BaseNode: BaseNode{Type: NodeTypeCallTaskFn},
+		Target:   target,
+		To:       to,
+		Catch:    catch,
+	}
 }
 
 func (c *CallTaskFn) String() string {
@@ -474,6 +730,15 @@ type ToExpr struct {
 	Body BlockStmt
 	Args ArgsExpr
 	Next *ToExpr
+}
+
+func NewToExpr(body BlockStmt, args ArgsExpr, next *ToExpr) *ToExpr {
+	return &ToExpr{
+		BaseNode: BaseNode{Type: NodeTypeToExpr},
+		Body:     body,
+		Args:     args,
+		Next:     next,
+	}
 }
 
 func (t *ToExpr) String() string {
