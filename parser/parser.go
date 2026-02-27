@@ -403,6 +403,10 @@ func (p *Parser) parsePropertyExpression() []*ast.Property {
 			properties = append(properties, ast.NewProperty(p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), key))
 		}
 		index++
+		// 跳过换行符
+		for p.peek().Type == token.NEWLINE {
+			p.advance()
+		}
 	}
 	return properties
 }
