@@ -24,16 +24,12 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 
 		idTk := p.expect(token.IDENT)
 
-		id := ast.Literal{Value: &idTk}
+		id := ast.NewLiteral(&idTk)
 		p.expect(token.ASSIGN)
 
 		value := p.parseExpression()
 
-		return &ast.VariableDecl{
-			Name:    id,
-			Value:   value,
-			IsConst: isConst,
-		}
+		return ast.NewVariableDecl(*id, value, isConst)
 	})
 
 	c.RegisterStmtHandler(token.USE, func(p *Parser) any {
@@ -50,11 +46,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			p.advance() // skip 'as'
 			alias := p.parsePrimaryExpression()
 			specifiers = append(specifiers, alias)
-			return &ast.UseDecl{
-				Specifiers: specifiers,
-				Source:     source,
-				Mode:       token.AS,
-			}
+			return ast.NewUseDecl(source, specifiers, token.USE)
 		} else if p.peek().Type == token.PICK {
 			p.advance() // skip 'pick'
 			if p.peek().Type == token.LPAREN {
@@ -72,7 +64,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 								panic(fmt.Sprintf("expected alias literal, got %s", aliasExpr.String()))
 							}
 						}
-						specifiers = append(specifiers, &ast.UseSpecifier{Remote: lit, Local: aliasLit})
+						specifiers = append(specifiers, ast.NewUseSpecifier(lit, aliasLit))
 					} else {
 						panic(fmt.Sprintf("expected literal, got %s", remoteExpr.String()))
 					}
@@ -81,11 +73,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 					}
 				}
 				p.expect(token.RPAREN)
-				return &ast.UseDecl{
-					Specifiers: specifiers,
-					Source:     source,
-					Mode:       token.PICK,
-				}
+				return ast.NewUseDecl(source, specifiers, token.PICK)
 			} else {
 				remoteExpr := p.parsePrimaryExpression()
 				if lit, ok := remoteExpr.(*ast.Literal); ok {
@@ -99,22 +87,14 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 							panic(fmt.Sprintf("expected alias literal, got %s", aliasExpr.String()))
 						}
 					}
-					specifiers = append(specifiers, &ast.UseSpecifier{Remote: lit, Local: aliasLit})
+					specifiers = append(specifiers, ast.NewUseSpecifier(lit, aliasLit))
 				} else {
 					panic(fmt.Sprintf("expected literal, got %s", remoteExpr.String()))
 				}
-				return &ast.UseDecl{
-					Specifiers: specifiers,
-					Source:     source,
-					Mode:       token.PICK,
-				}
+				return ast.NewUseDecl(source, specifiers, token.PICK)
 			}
 		} else {
-			return &ast.UseDecl{
-				Specifiers: specifiers,
-				Source:     source,
-				Mode:       token.USE,
-			}
+			return ast.NewUseDecl(source, specifiers, token.USE)
 		}
 	})
 
@@ -132,13 +112,13 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		if p.peek().Type == token.ELSE {
 			p.advance() // skip 'else'
 			if p.peek().Type == token.IF {
-				return &ast.IfStmt{Test: condition, Consequent: &ast.BlockStmt{Body: body}, Alternate: p.CallStmtHandler(token.IF)}
+				return ast.NewIfStmt(condition, ast.NewBlockStmt(body), p.CallStmtHandler(token.IF))
 			}
-			return &ast.IfStmt{Test: condition, Consequent: &ast.BlockStmt{Body: body}, Alternate: p.parseBlockStatement()}
+			return ast.NewIfStmt(condition, ast.NewBlockStmt(body), p.parseBlockStatement())
 		} else {
 			p.expect(token.END)
 		}
-		return &ast.IfStmt{Test: condition, Consequent: &ast.BlockStmt{Body: body}}
+		return ast.NewIfStmt(condition, ast.NewBlockStmt(body), nil)
 	})
 
 	c.RegisterStmtHandler(token.FOR, func(p *Parser) any {
@@ -157,11 +137,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			p.advance() // skip 'in'
 			iter := p.parseExpression()
 			body = p.parseBlockStatement()
-			return &ast.ForStmt{
-				Body:  *body,
-				Init:  firstExpr,
-				Range: iter,
-			}
+			return ast.NewForStmt(firstExpr, nil, nil, iter, *body)
 		}
 		// for i := 0; i < 10; i++ :
 		p.expect(token.SEMICOLON)
@@ -169,28 +145,19 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		p.expect(token.SEMICOLON)
 		thirdExpr := p.parseExpression()
 		body = p.parseBlockStatement()
-		return &ast.ForStmt{
-			Body:   *body,
-			Init:   firstExpr,
-			Value:  secondExpr,
-			Update: thirdExpr,
-		}
+		return ast.NewForStmt(firstExpr, secondExpr, thirdExpr, nil, *body)
 	})
 
 	c.RegisterStmtHandler(token.FN, func(p *Parser) any {
 		p.advance() // skip 'fn'
 		id := p.expect(token.IDENT)
-		var args = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+		var args = ast.NewArgsExpr([]ast.Expr{})
 		if p.peek().Type == token.LPAREN {
 			p.expect(token.LPAREN)
 			args = p.parseArgs()
 			p.expect(token.RPAREN)
 		}
-		return &ast.FunctionDecl{
-			ID:        p.createLiteral(id),
-			Arguments: args,
-			Body:      p.parseBlockStatement(),
-		}
+		return ast.NewFunctionDecl(p.createLiteral(id), args, p.parseBlockStatement())
 	})
 
 	c.RegisterStmtHandler(token.EXPOSE, func(p *Parser) any {
@@ -199,19 +166,19 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		switch p.peek().Type {
 		case token.FN:
 			decl := p.CallStmtHandler(token.FN)
-			return &ast.ExposeStmt{Decl: decl}
+			return ast.NewExposeStmt(decl, nil, nil)
 		case token.LET, token.CST:
 			decl := p.CallStmtHandler(p.peek().Type)
-			return &ast.ExposeStmt{Decl: decl}
+			return ast.NewExposeStmt(decl, nil, nil)
 		case token.IDENT:
 			idTk := p.expect(token.IDENT)
 			name := p.createLiteral(idTk)
 			if p.peek().Type == token.ASSIGN {
 				p.advance()
 				value := p.parseExpression()
-				return &ast.ExposeStmt{Name: name, Value: value}
+				return ast.NewExposeStmt(nil, name, value)
 			}
-			return &ast.ExposeStmt{Name: name}
+			return ast.NewExposeStmt(nil, name, nil)
 		default:
 			p.errorf(p.peek(), "unexpected token after expose: %s", p.peek().String())
 			return nil
@@ -237,12 +204,12 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			}
 		}
 		p.expect(token.END)
-		return &ast.SwitchStmt{Test: condition, Cases: cases}
+		return ast.NewSwitchStmt(condition, cases)
 	})
 
 	c.RegisterStmtHandler(token.RETURN, func(p *Parser) any {
 		p.advance() // skip 'return'
-		return &ast.ReturnStmt{Value: p.parseExpression()}
+		return ast.NewReturnStmt(p.parseExpression())
 	})
 
 	c.RegisterStmtHandler(token.TASK, func(p *Parser) any {
@@ -250,9 +217,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		fn := p.parseStatement()
 		if fn != nil {
 			if f, ok := fn.(*ast.FunctionDecl); ok {
-				return &ast.TaskStmt{
-					Fn: *f,
-				}
+				return ast.NewTaskStmt(*f)
 			}
 		}
 		panic(verror.ParseVError{
@@ -263,7 +228,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 
 	c.RegisterStmtHandler(token.WAIT, func(p *Parser) any {
 		p.advance() // skip 'wait'
-		return &ast.WaitStmt{Async: p.parseExpression()}
+		return ast.NewWaitStmt(p.parseExpression())
 	})
 
 	return c

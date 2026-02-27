@@ -37,30 +37,32 @@ func (i *Interpreter) Errorf(tk token.Token, format string) verror.InterpreterVE
 }
 
 func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, error) {
-	if node == nil || env == nil {
-		return nil, nil
-	}
 
-	switch n := node.(type) {
-	case *ast.ProgramStmt:
+	switch node.NodeType() {
+	case ast.NodeTypeProgramStmt:
+		program, ok := node.(*ast.ProgramStmt)
+		if !ok {
+			return nil, i.Errorf(token.Token{}, "Invalid program node")
+		}
 		var lastResult any
 		var err error
-		for _, s := range n.Body {
+		for _, s := range program.Body {
 			if _, ok := s.(*ast.CommentStmt); !ok {
 				lastResult, err = i.Eval(s, env)
 			}
 		}
 		return lastResult, err
-	case *ast.BlockStmt:
+	case ast.NodeTypeBlockStmt:
 		var lastResult any
 		var err error
-		for _, s := range n.Body {
+		for _, s := range node.(*ast.BlockStmt).Body {
 			if _, ok := s.(*ast.CommentStmt); !ok {
 				lastResult, err = i.Eval(s, env)
 			}
 		}
 		return lastResult, err
-	case *ast.UseDecl:
+	case ast.NodeTypeUseDecl:
+		n := node.(*ast.UseDecl)
 		var s token.Token
 		if n.Source != nil && n.Source.Value != nil && (n.Source.Value.Type == token.IDENT || n.Source.Value.Type == token.STRING) {
 			s = *n.Source.Value
@@ -148,9 +150,10 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			}
 		}
 		return s, nil
-	case *ast.ExpressionStmt:
-		return i.Eval(n.Expression, env)
-	case *ast.VariableDecl:
+	case ast.NodeTypeExpressionStmt:
+		return i.Eval(node.(*ast.ExpressionStmt).Expression, env)
+	case ast.NodeTypeVariableDecl:
+		n := node.(*ast.VariableDecl)
 		val, err := i.Eval(n.Value, env)
 		if n.IsConst {
 			env.DefineConst(*n.Name.Value, val)
@@ -158,7 +161,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			env.Define(*n.Name.Value, val)
 		}
 		return val, err
-	case *ast.ExposeStmt:
+	case ast.NodeTypeExposeStmt:
+		n := node.(*ast.ExposeStmt)
 		if env.Exports == nil {
 			env.Exports = store.NewStoreObject()
 		}
@@ -218,7 +222,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		}
 
 		return nil, i.Errorf(token.Token{}, "invalid expose statement")
-	case *ast.ForStmt:
+	case ast.NodeTypeForStmt:
+		n := node.(*ast.ForStmt)
 		loopEnv := environment.New(env.WorkSpace)
 		loopEnv.Link(env)
 		if n.Range != nil && n.Init != nil {
@@ -289,7 +294,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			result = res
 		}
 		return result, nil
-	case *ast.IfStmt:
+	case ast.NodeTypeIfStmt:
+		n := node.(*ast.IfStmt)
 		condVal, err := i.Eval(n.Test, env)
 		if err != nil {
 			return nil, err
@@ -303,7 +309,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		}
 
 		return i.Eval(n.Consequent, env)
-	case *ast.FunctionDecl:
+	case ast.NodeTypeFunctionDecl:
+		n := node.(*ast.FunctionDecl)
 		env.Define(*n.ID.Value, &types.FunctionLikeValNode{
 			IsLamda:  false,
 			IsModule: false,
@@ -314,7 +321,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			IsTask:   false,
 		})
 		return nil, nil
-	case *ast.LambdaFunctionDecl:
+	case ast.NodeTypeLambdaFunctionDecl:
+		n := node.(*ast.LambdaFunctionDecl)
 		return &types.FunctionLikeValNode{
 			IsLamda:  true,
 			IsModule: false,
@@ -324,9 +332,10 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			Body:     &n.Body,
 			IsTask:   false,
 		}, nil
-	case *ast.ReturnStmt:
-		return i.Eval(n.Value, env)
-	case *ast.SwitchStmt:
+	case ast.NodeTypeReturnStmt:
+		return i.Eval(node.(*ast.ReturnStmt).Value, env)
+	case ast.NodeTypeSwitchStmt:
+		n := node.(*ast.SwitchStmt)
 		condVal, err := i.Eval(n.Test, env)
 		if err != nil {
 			return nil, err
@@ -360,7 +369,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		}
 
 		return nil, nil
-	case *ast.TaskStmt:
+	case ast.NodeTypeTaskStmt:
+		n := node.(*ast.TaskStmt)
 		env.Define(*n.Fn.ID.Value, &types.FunctionLikeValNode{
 			IsLamda:  false,
 			IsModule: false,
@@ -371,8 +381,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			IsTask:   true,
 		})
 		return nil, nil
-	case *ast.WaitStmt:
-		target, err := i.Eval(n.Async, env)
+	case ast.NodeTypeWaitStmt:
+		target, err := i.Eval(node.(*ast.WaitStmt).Async, env)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +390,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			return taskObject.Wait(), nil
 		}
 		return nil, nil
-	case *ast.CallTaskFn:
+	case ast.NodeTypeCallTaskFn:
+		n := node.(*ast.CallTaskFn)
 		target, err := i.Eval(&n.Target, env)
 		if err != nil {
 			return nil, err
@@ -453,7 +464,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			return nil, nil
 		}
 		return nil, i.Errorf(token.Token{}, "not a task function")
-	case *ast.ToExpr:
+	case ast.NodeTypeToExpr:
+		n := node.(*ast.ToExpr)
 		var Next *types.TaskToValNode
 		if n.Next != nil {
 			// 将Expr转换为 TaskToValNode
@@ -491,7 +503,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			return res
 		}
 		return &toVal, nil
-	case *ast.AssignmentExpr:
+	case ast.NodeTypeAssignmentExpr:
+		n := node.(*ast.AssignmentExpr)
 		var err error
 		operand, ok := n.Left.(*ast.Literal)
 		if !ok {
@@ -504,7 +517,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		val, err := i.Eval(n.Right, env)
 		env.Set(*operand.Value, val)
 		return nil, err
-	case *ast.CompareExpr:
+	case ast.NodeTypeCompareExpr:
+		n := node.(*ast.CompareExpr)
 		leftRaw, err := i.Eval(n.Left, env)
 		if err != nil {
 			return nil, i.Errorf(n.Operator, err.Error())
@@ -515,7 +529,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		}
 
 		return utils.CompareVal(leftRaw, n.Operator.Type, rightRaw)
-	case *ast.BinaryExpr:
+	case ast.NodeTypeBinaryExpr:
+		n := node.(*ast.BinaryExpr)
 		{
 			leftRaw, err := i.Eval(n.Left, env)
 			if err != nil {
@@ -529,9 +544,10 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
 			return result, err
 		}
-	case *ast.Property:
-		return n, nil
-	case *ast.ArrayExpr:
+	case ast.NodeTypeProperty:
+		return node, nil
+	case ast.NodeTypeArrayExpr:
+		n := node.(*ast.ArrayExpr)
 		var arr = make([]any, len(n.Items))
 		for index, element := range n.Items {
 			v, err := i.Eval(element.Value, env)
@@ -541,7 +557,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			arr[index] = v
 		}
 		return arr, nil
-	case *ast.ObjectExpr:
+	case ast.NodeTypeObjectExpr:
+		n := node.(*ast.ObjectExpr)
 		obj := store.NewStoreObject()
 		obj.Define(token.Token{Type: token.IDENT, Value: "__proto__"}, store.NewStoreObject())
 		for _, prop := range n.Properties {
@@ -557,7 +574,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			}
 		}
 		return obj, nil
-	case *ast.MemberExpr:
+	case ast.NodeTypeMemberExpr:
+		n := node.(*ast.MemberExpr)
 		obj, err := i.Eval(n.Object, env)
 		if obj == nil {
 			return nil, i.Errorf(token.Token{}, "nil object")
@@ -651,7 +669,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		}
 
 		return nil, i.Errorf(token.Token{}, fmt.Sprintf("property %s not found", prop))
-	case *ast.ArgsExpr:
+	case ast.NodeTypeArgsExpr:
+		n := node.(*ast.ArgsExpr)
 		for index, arg := range n.Arguments {
 			v, err := i.Eval(arg, env)
 			if err != nil {
@@ -660,7 +679,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 			n.Arguments[index] = v.(ast.Expr)
 		}
 		return n, nil
-	case *ast.CallExpr:
+	case ast.NodeTypeCallExpr:
+		n := node.(*ast.CallExpr)
 		{
 			function, _ := i.Eval(n.Callee, env)
 
@@ -710,7 +730,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 				return nil, i.Errorf(token.Token{}, "Not a function")
 			}
 		}
-	case *ast.UnaryExpr:
+	case ast.NodeTypeUnaryExpr:
+		n := node.(*ast.UnaryExpr)
 		if n.Operator.Type == token.MINUS || n.Operator.Type == token.NOT {
 			val, err := i.Eval(n.Value, env)
 			if err != nil {
@@ -782,7 +803,8 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		} else {
 			return newVal, nil
 		}
-	case *ast.Literal:
+	case ast.NodeTypeLiteral:
+		n := node.(*ast.Literal)
 		switch n.Value.Type {
 		case token.INT:
 			num, err := n.Value.GetInt()
@@ -834,7 +856,6 @@ func (i *Interpreter) EvalSafe() (any, error) {
 		}
 	}()
 	ast := i.p.ParseProgram()
-	// ast.Print()
 	v, e := i.Eval(ast, i.env)
 	if e != nil {
 		return nil, e
