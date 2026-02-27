@@ -327,10 +327,23 @@ func isSimpleLoopBody(body *ast.BlockStmt) bool {
 		case *ast.ForStmt, *ast.IfStmt:
 			// 嵌套控制结构通常需要隔离作用域
 			return false
-		case *ast.FunctionDecl:
+		case *ast.FunctionDecl, *ast.LambdaFunctionDecl:
 			// 函数声明需要隔离作用域
 			return false
+		case *ast.SwitchStmt:
+			// switch语句需要隔离作用域
+			return false
+		case *ast.TaskStmt:
+			// task语句需要隔离作用域
+			return false
+		case *ast.CallTaskFn:
+			// task调用需要隔离作用域
+			return false
+		case *ast.ToExpr:
+			// to表达式需要隔离作用域
+			return false
 		}
+		// 赋值语句、表达式语句、return语句等不需要隔离作用域
 	}
 	return true
 }
