@@ -1,1 +1,1 @@
-sh dev.sh "examples/time/index.vine"
+sh dev.sh "examples/time/index.vine" && sh dev.sh "examples/time/index.vine" && sh dev.sh "examples/time/index.vine" && sh dev.sh "examples/time/index.vine"
