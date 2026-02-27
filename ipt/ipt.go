@@ -236,19 +236,30 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 		}
 
 		if reflect.TypeOf(value).Kind() == reflect.Slice || reflect.TypeOf(value).Kind() == reflect.Array {
-			for index := 0; index < reflect.ValueOf(value).Len(); index++ {
-				bodyEnv := environment.NewPooled(env.FileName)
-				bodyEnv.Define(*name.Value, reflect.ValueOf(value).Index(index).Interface())
-				bodyEnv.Link(loopEnv)
+			valueOf := reflect.ValueOf(value)
+			length := valueOf.Len()
+			// 对于简单的循环体（不包含break/continue等），直接在loopEnv中执行
+			// 只有在需要隔离作用域时才创建新环境
+			simpleBody := isSimpleLoopBody(&n.Body)
 
-				_, err := i.Eval(&n.Body, bodyEnv)
-
-				bodyEnv.Release()
+			for index := 0; index < length; index++ {
+				var bodyEnv *environment.Environment
+				if simpleBody {
+					// 简单循环体直接使用loopEnv，避免环境创建和释放
+					loopEnv.Set(*name.Value, valueOf.Index(index).Interface())
+					_, err = i.Eval(&n.Body, loopEnv)
+				} else {
+					// 复杂循环体需要隔离作用域
+					bodyEnv = environment.NewPooled(env.FileName)
+					bodyEnv.Define(*name.Value, valueOf.Index(index).Interface())
+					bodyEnv.Link(loopEnv)
+					_, err = i.Eval(&n.Body, bodyEnv)
+					bodyEnv.Release()
+				}
 
 				if err != nil {
 					return nil, err
 				}
-
 			}
 		}
 
@@ -259,6 +270,9 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 		return nil, err
 	}
 	var result any
+
+	// 判断是否需要隔离作用域
+	simpleBody := isSimpleLoopBody(&n.Body)
 
 	for {
 		if n.Value != nil {
@@ -272,12 +286,19 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 			}
 		}
 
-		bodyEnv := environment.NewPooled(env.FileName)
-		bodyEnv.Link(loopEnv)
+		var err error
+		var res any
 
-		res, err := i.Eval(&n.Body, bodyEnv)
-
-		bodyEnv.Release()
+		if simpleBody {
+			// 简单循环体直接使用loopEnv
+			res, err = i.Eval(&n.Body, loopEnv)
+		} else {
+			// 复杂循环体需要隔离作用域
+			bodyEnv := environment.NewPooled(env.FileName)
+			bodyEnv.Link(loopEnv)
+			res, err = i.Eval(&n.Body, bodyEnv)
+			bodyEnv.Release()
+		}
 
 		if err != nil {
 			return nil, err
@@ -291,6 +312,27 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 		result = res
 	}
 	return result, nil
+}
+
+// 判断循环体是否简单（不包含需要隔离作用域的语句）
+func isSimpleLoopBody(body *ast.BlockStmt) bool {
+	if body == nil {
+		return true
+	}
+	for _, stmt := range body.Body {
+		switch stmt.(type) {
+		case *ast.VariableDecl:
+			// 如果有变量声明，需要隔离作用域
+			return false
+		case *ast.ForStmt, *ast.IfStmt:
+			// 嵌套控制结构通常需要隔离作用域
+			return false
+		case *ast.FunctionDecl:
+			// 函数声明需要隔离作用域
+			return false
+		}
+	}
+	return true
 }
 
 func (i *Interpreter) EvalIfStmt(n *ast.IfStmt, env *environment.Environment) (any, error) {
@@ -510,7 +552,6 @@ func (i *Interpreter) EvalToExpr(n *ast.ToExpr, env *environment.Environment) (a
 }
 
 func (i *Interpreter) EvalAssignmentExpr(n *ast.AssignmentExpr, env *environment.Environment) (any, error) {
-	var err error
 	operand, ok := n.Left.(*ast.Literal)
 	if !ok {
 		return nil, i.Errorf(n.Operator, "operand of assign must be a variable")
@@ -520,8 +561,11 @@ func (i *Interpreter) EvalAssignmentExpr(n *ast.AssignmentExpr, env *environment
 	}
 
 	val, err := i.Eval(n.Right, env)
+	if err != nil {
+		return nil, err
+	}
 	env.Set(*operand.Value, val)
-	return nil, err
+	return nil, nil
 }
 
 func (i *Interpreter) EvalCompareExpr(n *ast.CompareExpr, env *environment.Environment) (any, error) {
@@ -534,6 +578,47 @@ func (i *Interpreter) EvalCompareExpr(n *ast.CompareExpr, env *environment.Envir
 		return nil, i.Errorf(n.Operator, err.Error())
 	}
 
+	// 快速路径处理常见的整数比较，避免类型解析开销
+	if left, ok := leftRaw.(int64); ok {
+		if right, ok := rightRaw.(int64); ok {
+			switch n.Operator.Type {
+			case token.EQ:
+				return left == right, nil
+			case token.NOT_EQ:
+				return left != right, nil
+			case token.LESS:
+				return left < right, nil
+			case token.LESS_EQ:
+				return left <= right, nil
+			case token.GREATER:
+				return left > right, nil
+			case token.GREATER_EQ:
+				return left >= right, nil
+			}
+		}
+	}
+
+	// 快速路径处理常见的浮点数比较
+	if left, ok := leftRaw.(float64); ok {
+		if right, ok := rightRaw.(float64); ok {
+			switch n.Operator.Type {
+			case token.EQ:
+				return left == right, nil
+			case token.NOT_EQ:
+				return left != right, nil
+			case token.LESS:
+				return left < right, nil
+			case token.LESS_EQ:
+				return left <= right, nil
+			case token.GREATER:
+				return left > right, nil
+			case token.GREATER_EQ:
+				return left >= right, nil
+			}
+		}
+	}
+
+	// 其他情况使用通用的CompareVal处理
 	return utils.CompareVal(leftRaw, n.Operator.Type, rightRaw)
 }
 
@@ -547,6 +632,48 @@ func (i *Interpreter) EvalBinaryExpr(n *ast.BinaryExpr, env *environment.Environ
 		return nil, i.Errorf(n.Operator, err.Error())
 	}
 
+	// 快速路径处理常见的整数运算，避免类型解析开销
+	if left, ok := leftRaw.(int64); ok {
+		if right, ok := rightRaw.(int64); ok {
+			switch n.Operator.Type {
+			case token.PLUS:
+				return left + right, nil
+			case token.MINUS:
+				return left - right, nil
+			case token.MUL:
+				return left * right, nil
+			case token.DIV:
+				if right == 0 {
+					return nil, i.Errorf(n.Operator, "division by zero")
+				}
+				if left%right == 0 {
+					return left / right, nil
+				}
+				return float64(left) / float64(right), nil
+			}
+		}
+	}
+
+	// 快速路径处理常见的浮点数运算
+	if left, ok := leftRaw.(float64); ok {
+		if right, ok := rightRaw.(float64); ok {
+			switch n.Operator.Type {
+			case token.PLUS:
+				return left + right, nil
+			case token.MINUS:
+				return left - right, nil
+			case token.MUL:
+				return left * right, nil
+			case token.DIV:
+				if right == 0 {
+					return nil, i.Errorf(n.Operator, "division by zero")
+				}
+				return left / right, nil
+			}
+		}
+	}
+
+	// 其他情况使用通用的BinaryVal处理
 	result, err := utils.BinaryVal(leftRaw, n.Operator.Type, rightRaw)
 	return result, err
 }
@@ -702,7 +829,8 @@ func (i *Interpreter) EvalCallExpr(n *ast.CallExpr, env *environment.Environment
 	} else if reflect.ValueOf(function).Kind() == reflect.Func {
 		return env.CallFuncObject(function, args)
 	} else if fn, ok := function.(*types.FunctionLikeValNode); ok {
-		newEnv := environment.New(env.WorkSpace)
+		// 对于简单函数（不包含嵌套函数声明），使用池化的环境
+		newEnv := environment.NewPooled(env.FileName)
 		newEnv.Link(env) // 继承父环境
 
 		for index, arg := range fn.Args.Arguments {
@@ -728,6 +856,7 @@ func (i *Interpreter) EvalCallExpr(n *ast.CallExpr, env *environment.Environment
 			return tk, nil
 		} else {
 			res, err := i.Eval(fn.Body, newEnv)
+			newEnv.Release() // 释放环境到池中
 			if err != nil {
 				return nil, err
 			}
