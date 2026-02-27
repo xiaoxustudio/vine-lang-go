@@ -139,13 +139,12 @@ func (p *Parser) expect(types ...token.TokenType) Token {
 
 /* Creaters  */
 func (p *Parser) createLiteral(val token.Token) *ast.Literal {
-	return &ast.Literal{Value: &val}
+	return ast.NewLiteral(&val)
 }
 
 /* Parsers */
 func (p *Parser) ParseProgram() *ast.ProgramStmt {
-	p.ast = &ast.ProgramStmt{}
-	p.ast.Body = []ast.Stmt{}
+	p.ast = ast.NewProgramStmt([]ast.Stmt{})
 
 	for !p.isEof() {
 		if p.peek().Type == token.EOF {
@@ -191,12 +190,12 @@ func (p *Parser) parseBlockStatement() *ast.BlockStmt {
 		}
 	}
 	p.expect(token.END)
-	return &ast.BlockStmt{Body: body}
+	return ast.NewBlockStmt(body)
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStmt {
 	expr := p.parseExpression()
-	return &ast.ExpressionStmt{Expression: expr}
+	return ast.NewExpressionStmt(expr)
 }
 
 /* Expr */
@@ -212,7 +211,7 @@ func (p *Parser) parseAssignmentExpression() ast.Expr {
 	if p.peek().Type == token.ASSIGN {
 		op := p.expect(token.ASSIGN)
 		right := p.parseAssignmentExpression()
-		return &ast.AssignmentExpr{Left: left, Right: right, Operator: op}
+		return ast.NewAssignmentExpr(left, right, op)
 	}
 	return left
 }
@@ -225,7 +224,7 @@ func (p *Parser) parseLogicalExpression() ast.Expr {
 	if p.peek().Type == token.OR || p.peek().Type == token.AND {
 		op := p.advance()
 		right := p.parseLogicalExpression()
-		return &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+		return ast.NewBinaryExpr(left, right, op)
 	}
 	return left
 }
@@ -238,7 +237,7 @@ func (p *Parser) parseCompareExpression() ast.Expr {
 	if p.peek().Type == token.EQ || p.peek().Type == token.NOT_EQ || p.peek().Type == token.LESS_EQ || p.peek().Type == token.GREATER_EQ || p.peek().Type == token.LESS || p.peek().Type == token.GREATER {
 		op := p.advance()
 		right := p.parseCompareExpression()
-		return &ast.CompareExpr{Left: left, Operator: op, Right: right}
+		return ast.NewCompareExpr(left, right, op)
 	}
 	return left
 }
@@ -258,7 +257,7 @@ func (p *Parser) parseAdditiveExpression() ast.Expr {
 	for p.peek().Type == token.PLUS || p.peek().Type == token.MINUS {
 		op := p.advance()
 		right := p.parseMultiplicativeExpression()
-		left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+		left = ast.NewBinaryExpr(left, right, op)
 	}
 	return left
 }
@@ -271,7 +270,7 @@ func (p *Parser) parseMultiplicativeExpression() ast.Expr {
 	for p.peek().Type == token.MUL || p.peek().Type == token.DIV {
 		op := p.advance()
 		right := p.parseCallExpression()
-		left = &ast.BinaryExpr{Left: left, Operator: op, Right: right}
+		left = ast.NewBinaryExpr(left, right, op)
 	}
 	return left
 }
@@ -280,7 +279,7 @@ func (p *Parser) parseArgs() *ast.ArgsExpr {
 	if p.isEof() {
 		return nil
 	}
-	var node = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+	var node = ast.NewArgsExpr([]ast.Expr{})
 	for !p.isEof() && p.peek().Type != token.RPAREN {
 		expr := p.parseExpression()
 		if expr == nil {
@@ -303,19 +302,19 @@ func (p *Parser) parseCallExpression() ast.Expr {
 		p.advance()
 		args := p.parseArgs()
 		p.expect(token.RPAREN)
-		left = &ast.CallExpr{Callee: left, Args: *args}
+		left = ast.NewCallExpr(left, *args)
 
 		// 可能是换行
 		if p.peek().Type == token.NEWLINE {
 			p.advance()
 		}
 
-		var parentToStmt = &ast.ToExpr{Next: nil}
+		var parentToStmt = ast.NewToExpr(*ast.NewBlockStmt([]ast.Stmt{}), *ast.NewArgsExpr([]ast.Expr{}), nil)
 		var currentToStmt = parentToStmt
 		if p.peek().Type == token.TO {
 			for p.peek().Type == token.TO || p.peek().Type != token.CATCH {
 				p.advance()
-				toStmt := &ast.ToExpr{}
+				toStmt := ast.NewToExpr(*ast.NewBlockStmt([]ast.Stmt{}), *ast.NewArgsExpr([]ast.Expr{}), nil)
 				if p.peek().Type == token.LPAREN {
 					p.advance()
 					args := p.parseArgs()
@@ -323,7 +322,7 @@ func (p *Parser) parseCallExpression() ast.Expr {
 					toStmt.Args = *args
 				}
 				p.expect(token.COLON)
-				var block = &ast.BlockStmt{Body: []ast.Stmt{}}
+				var block = ast.NewBlockStmt([]ast.Stmt{})
 				for !slices.Contains([]token.TokenType{token.TO, token.END, token.CATCH}, p.peek().Type) && !p.isEof() {
 					stmt := p.parseStatement()
 					if stmt != nil {
@@ -336,21 +335,21 @@ func (p *Parser) parseCallExpression() ast.Expr {
 					currentToStmt = toStmt
 				}
 			}
-			var catchStmt = &ast.LambdaFunctionDecl{Body: ast.BlockStmt{}}
+			var catchStmt *ast.LambdaFunctionDecl
 			if p.peek().Type == token.CATCH {
 				p.advance()
 				p.expect(token.LPAREN)
 				args := p.parseArgs()
 				p.expect(token.RPAREN)
 				p.expect(token.COLON)
-				var blockStmt = &ast.BlockStmt{Body: []ast.Stmt{}}
+				var blockStmt = ast.NewBlockStmt([]ast.Stmt{})
 				for !p.isEof() && p.peek().Type != token.END {
 					stmt := p.parseStatement()
 					if stmt != nil {
 						blockStmt.Body = append(blockStmt.Body, stmt)
 					}
 				}
-				catchStmt = &ast.LambdaFunctionDecl{Args: *args, Body: *blockStmt}
+				catchStmt = ast.NewLambdaFunctionDecl(*args, *blockStmt)
 			}
 
 			p.expect(token.END)
@@ -360,11 +359,7 @@ func (p *Parser) parseCallExpression() ast.Expr {
 				return left
 			}
 
-			return &ast.CallTaskFn{
-				Target: *target,
-				To:     *parentToStmt.Next,
-				Catch:  catchStmt,
-			}
+			return ast.NewCallTaskFn(*target, *parentToStmt.Next, catchStmt)
 		}
 	}
 
@@ -376,18 +371,18 @@ func (p *Parser) parseLambda() *ast.LambdaFunctionDecl {
 		return nil
 	}
 	p.expect(token.FN)
-	var args = &ast.ArgsExpr{Arguments: []ast.Expr{}}
+	var args = ast.NewArgsExpr([]ast.Expr{})
 	if p.peek().Type == token.LPAREN {
 		p.expect(token.LPAREN)
 		args = p.parseArgs()
 		p.expect(token.RPAREN)
 	}
 	body := p.parseBlockStatement()
-	return &ast.LambdaFunctionDecl{Args: *args, Body: *body}
+	return ast.NewLambdaFunctionDecl(*args, *body)
 }
 
 func (p *Parser) parsePropertyExpression() []*ast.Property {
-	var properties = []*ast.Property{}
+	var properties = make([]*ast.Property, 0)
 	if p.isEof() {
 		return properties
 	}
@@ -400,12 +395,12 @@ func (p *Parser) parsePropertyExpression() []*ast.Property {
 			if p.peek().Type == token.COMMA {
 				p.advance()
 			}
-			properties = append(properties, &ast.Property{Key: key.(*ast.Literal), Value: value})
+			properties = append(properties, ast.NewProperty(key.(*ast.Literal), value))
 		} else {
 			if p.peek().Type == token.COMMA {
 				p.advance()
 			}
-			properties = append(properties, &ast.Property{Key: p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), Value: key})
+			properties = append(properties, ast.NewProperty(p.createLiteral(token.Token{Type: token.INT, Value: fmt.Sprint(index)}), key))
 		}
 		index++
 	}
@@ -417,7 +412,7 @@ func (p *Parser) parseArrayExpression() ast.Expr {
 		return nil
 	}
 	args := p.parsePropertyExpression()
-	arr := &ast.ArrayExpr{Items: args}
+	arr := ast.NewArrayExpr(args)
 	return arr
 }
 
@@ -426,7 +421,7 @@ func (p *Parser) parseObjectExpression() ast.Expr {
 		return nil
 	}
 	args := p.parsePropertyExpression()
-	obj := &ast.ObjectExpr{Properties: args}
+	obj := ast.NewObjectExpr(args)
 	return obj
 }
 
@@ -438,12 +433,12 @@ func (p *Parser) parseMemberExpression() ast.Expr {
 	if p.peek().Type == token.DOT {
 		p.advance()
 		right := p.parseMemberExpression()
-		return &ast.MemberExpr{Object: left, Property: right}
+		return ast.NewMemberExpr(left, right, false)
 	} else if p.peek().Type == token.LBRACKET {
 		p.advance()
 		right := p.parseMemberExpression()
 		p.expect(token.RBRACKET)
-		return &ast.MemberExpr{Object: left, Property: right, Computed: true}
+		return ast.NewMemberExpr(left, right, true)
 	}
 	return left
 }
@@ -455,7 +450,7 @@ func (p *Parser) parseSuffixExpression() ast.Expr {
 	left := p.parsePrimaryExpression()
 	if p.peek().Type == token.INC || p.peek().Type == token.DEC {
 		op := p.advance()
-		return &ast.UnaryExpr{Operator: op, Value: left, IsSuffix: true}
+		return ast.NewUnaryExpr(left, op, true)
 	}
 	return left
 }
@@ -471,7 +466,7 @@ func (p *Parser) parseSwitchCase() ast.Expr {
 		p.errorf(p.peek(), "unexpected token(switch case): %s", p.peek().String())
 	}
 	var isDefault = kw.Type == token.DEFAULT
-	var node = &ast.SwitchCase{Conds: nil, Body: &ast.BlockStmt{}, IsDefault: isDefault}
+	var node = ast.NewSwitchCase(nil, nil, isDefault)
 	var cond ast.Expr
 	if !isDefault {
 		for p.peek().Type != token.COLON {
@@ -495,7 +490,7 @@ func (p *Parser) parseSwitchCase() ast.Expr {
 	if p.peek().Type == token.BREAK {
 		p.advance()
 	}
-	node.Body = &ast.BlockStmt{Body: body}
+	node.Body = ast.NewBlockStmt(body)
 	return node
 }
 
@@ -527,7 +522,7 @@ func (p *Parser) parsePrimaryExpression() ast.Expr {
 	case token.NOT, token.MINUS, token.DEC, token.INC:
 		op := p.advance()
 		right := p.parseSuffixExpression()
-		return &ast.UnaryExpr{Operator: op, Value: right, IsSuffix: false}
+		return ast.NewUnaryExpr(right, op, false)
 	case token.WAIT:
 		return p.CallStmtHandler(token.WAIT)
 	case token.FN:
