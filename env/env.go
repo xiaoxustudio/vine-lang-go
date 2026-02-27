@@ -85,6 +85,14 @@ func (e *Environment) Get(name Token) (any, bool) {
 	return nil, false
 }
 
+// GetFast 快速获取变量值，仅在当前环境查找，不遍历父环境
+func (e *Environment) GetFast(name string) (any, bool) {
+	if tk, exists := e.nameMap[name]; exists {
+		return e.store[tk], true
+	}
+	return nil, false
+}
+
 func (e *Environment) Lookup(name Token) (Environment, Token) {
 	if tk, exists := e.nameMap[name.Value]; exists {
 		return *e, tk
@@ -118,6 +126,18 @@ func (e *Environment) Set(name Token, val any) {
 	}
 }
 
+// SetFast 快速设置变量值，用于已知变量存在且不是常量的情况
+// 仅在当前环境查找，不遍历父环境
+func (e *Environment) SetFast(name string, val any) {
+	if tk, exists := e.nameMap[name]; exists {
+		e.store[tk] = val
+	} else {
+		// 如果当前环境不存在，则定义新变量
+		e.store[Token{Type: token.IDENT, Value: name}] = val
+		e.nameMap[name] = Token{Type: token.IDENT, Value: name}
+	}
+}
+
 func (e *Environment) Define(name Token, val any) error {
 	_, tk := e.Lookup(name)
 	if !tk.IsEmpty() {
@@ -130,6 +150,13 @@ func (e *Environment) Define(name Token, val any) error {
 		e.nameMap[name.Value] = name
 	}
 	return nil
+}
+
+// DefineFast 快速定义变量，不检查是否已存在
+func (e *Environment) DefineFast(name string, val any) {
+	tk := Token{Type: token.IDENT, Value: name}
+	e.store[tk] = val
+	e.nameMap[name] = tk
 }
 
 // 定义临时参数

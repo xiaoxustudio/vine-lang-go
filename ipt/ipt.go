@@ -153,7 +153,7 @@ func (i *Interpreter) EvalVariableDecl(n *ast.VariableDecl, env *environment.Env
 	if n.IsConst {
 		env.DefineConst(*n.Name.Value, val)
 	} else {
-		env.Define(*n.Name.Value, val)
+		env.DefineFast(n.Name.Value.Value, val)
 	}
 	return val, err
 }
@@ -241,17 +241,18 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 			// 对于简单的循环体（不包含break/continue等），直接在loopEnv中执行
 			// 只有在需要隔离作用域时才创建新环境
 			simpleBody := isSimpleLoopBody(&n.Body)
+			nameToken := *name.Value
 
 			for index := 0; index < length; index++ {
-				var bodyEnv *environment.Environment
 				if simpleBody {
 					// 简单循环体直接使用loopEnv，避免环境创建和释放
-					loopEnv.Set(*name.Value, valueOf.Index(index).Interface())
+					// 使用SetFast方法，避免Lookup开销
+					loopEnv.SetFast(nameToken.Value, valueOf.Index(index).Interface())
 					_, err = i.Eval(&n.Body, loopEnv)
 				} else {
 					// 复杂循环体需要隔离作用域
-					bodyEnv = environment.NewPooled(env.FileName)
-					bodyEnv.Define(*name.Value, valueOf.Index(index).Interface())
+					bodyEnv := environment.NewPooled(env.FileName)
+					bodyEnv.Define(nameToken, valueOf.Index(index).Interface())
 					bodyEnv.Link(loopEnv)
 					_, err = i.Eval(&n.Body, bodyEnv)
 					bodyEnv.Release()
@@ -577,7 +578,7 @@ func (i *Interpreter) EvalAssignmentExpr(n *ast.AssignmentExpr, env *environment
 	if err != nil {
 		return nil, err
 	}
-	env.Set(*operand.Value, val)
+	env.SetFast(operand.Value.Value, val)
 	return nil, nil
 }
 
@@ -839,8 +840,6 @@ func (i *Interpreter) EvalCallExpr(n *ast.CallExpr, env *environment.Environment
 
 	if fn, ok := function.(token.Token); ok {
 		return env.CallFunc(fn, args)
-	} else if reflect.ValueOf(function).Kind() == reflect.Func {
-		return env.CallFuncObject(function, args)
 	} else if fn, ok := function.(*types.FunctionLikeValNode); ok {
 		// 对于简单函数（不包含嵌套函数声明），使用池化的环境
 		newEnv := environment.NewPooled(env.FileName)
@@ -849,9 +848,11 @@ func (i *Interpreter) EvalCallExpr(n *ast.CallExpr, env *environment.Environment
 		for index, arg := range fn.Args.Arguments {
 			name, ok := arg.(*ast.Literal)
 			if !ok {
+				newEnv.Release()
 				return nil, i.Errorf(token.Token{}, "Not a valid variable to bind")
 			}
 			if len(args) <= index {
+				newEnv.Release()
 				return nil, i.Errorf(token.Token{}, "Not enough arguments")
 			}
 			newEnv.DefinePassing(*name.Value, args[index])
@@ -875,6 +876,8 @@ func (i *Interpreter) EvalCallExpr(n *ast.CallExpr, env *environment.Environment
 			}
 			return res, nil
 		}
+	} else if reflect.ValueOf(function).Kind() == reflect.Func {
+		return env.CallFuncObject(function, args)
 	} else {
 		return nil, i.Errorf(token.Token{}, "Not a function")
 	}
@@ -945,7 +948,7 @@ func (i *Interpreter) EvalUnaryExpr(n *ast.UnaryExpr, env *environment.Environme
 		return nil, i.Errorf(*operand.Value, fmt.Sprintf("invalid operation: %s (non-numeric type %T)", n.Operator.Value, v))
 	}
 
-	env.Set(*operand.Value, newVal)
+	env.SetFast(operand.Value.Value, newVal)
 
 	if n.IsSuffix {
 		return oldVal, nil
@@ -977,13 +980,19 @@ func (i *Interpreter) EvalLiteral(n *ast.Literal, env *environment.Environment) 
 	case token.NIL:
 		return nil, nil
 	case token.IDENT:
-		ok := types.LibsKeywords(n.Value.Value)
+		if v, isGet := env.GetFast(n.Value.Value); isGet {
+			if reflect.ValueOf(v).Kind() == reflect.Func {
+				return *n.Value, nil
+			}
+			return v, nil
+		}
 		if v, isGet := env.Get(*n.Value); isGet {
 			if reflect.ValueOf(v).Kind() == reflect.Func {
 				return *n.Value, nil
 			}
 			return v, nil
 		}
+		ok := types.LibsKeywords(n.Value.Value)
 		if ok.IsValidLibsKeyword() {
 			return *n.Value, nil
 		}
