@@ -43,6 +43,33 @@ func Print(env any, rangeArgs ...any) {
 			fmt.Print(store.StoreObjectToReadableJSON(v), " ")
 			continue
 		}
+		if v, ok := arg.(*types.FunctionLikeValNode); ok {
+			fmt.Print(fmt.Sprintf("<fn %p>", v), " ")
+			continue
+		}
+		if v, ok := arg.(*types.LibsModuleObject); ok {
+			fmt.Print(fmt.Sprintf("<module %p>", v), " ")
+			continue
+		}
+		if v, ok := arg.(*types.TaskToValNode); ok {
+			fmt.Print(fmt.Sprintf("<task %p>", v), " ")
+			continue
+		}
+		if v, ok := arg.(*types.ErrorValNode); ok {
+			fmt.Print(fmt.Sprintf("<error %p>", v), " ")
+		}
+
+		fmt.Print(utils.TrasformPrintStringWithColor(arg), " ")
+	}
+	fmt.Println()
+}
+
+func PrintWithColor(env any, rangeArgs ...any) {
+	if len(rangeArgs) == 0 {
+		return
+	}
+
+	for _, arg := range rangeArgs {
 		fmt.Print(utils.TrasformPrintStringWithColor(arg), " ")
 	}
 	fmt.Println()
