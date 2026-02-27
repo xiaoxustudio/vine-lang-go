@@ -464,6 +464,9 @@ func (p *Parser) parseSwitchCase() ast.Expr {
 		return nil
 	}
 	var kw Token
+	for p.peek().Type == token.NEWLINE || p.peek().Type == token.WHITESPACE || p.peek().Type == token.COMMENT {
+		p.advance()
+	}
 	if p.peek().Type == token.CASE || p.peek().Type == token.DEFAULT {
 		kw = p.advance()
 	} else {
@@ -485,15 +488,13 @@ func (p *Parser) parseSwitchCase() ast.Expr {
 
 	/* 解析body */
 	var body []ast.Stmt
-	for !p.isEof() && !slices.Contains([]token.TokenType{token.DEFAULT, token.BREAK, token.CASE}, p.peek().Type) {
+	for !p.isEof() && !slices.Contains([]token.TokenType{token.DEFAULT, token.CASE, token.END}, p.peek().Type) {
 		stmt := p.parseStatement()
 		if stmt != nil {
 			body = append(body, stmt)
 		}
 	}
-	if p.peek().Type == token.BREAK {
-		p.advance()
-	}
+
 	node.Body = ast.NewBlockStmt(body)
 	return node
 }

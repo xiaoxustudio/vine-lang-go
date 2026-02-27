@@ -38,6 +38,8 @@ const (
 	NodeTypeLiteral
 	NodeTypeUseSpecifier
 	NodeTypeSwitchCase
+	NodeTypeBreakStmt
+	NodeTypeContinueStmt
 
 	NodeTypeCommentStmt
 	NodeTypeBaseNode
@@ -753,6 +755,44 @@ func (s *SwitchStmt) String() string {
 		cases[i] = case_.String()
 	}
 	return fmt.Sprintf("SwitchStmt(%s, %s)", s.Test.String(), cases)
+}
+
+// BreakStmt
+type BreakStmt struct {
+	BaseNode
+}
+
+func NewBreakStmt() *BreakStmt {
+	return &BreakStmt{
+		BaseNode: BaseNode{Type: NodeTypeBreakStmt},
+	}
+}
+
+func (b *BreakStmt) NodeType() NodeType {
+	return b.Type
+}
+
+func (b *BreakStmt) String() string {
+	return "BreakStmt"
+}
+
+// ContinueStmt
+type ContinueStmt struct {
+	BaseNode
+}
+
+func NewContinueStmt() *ContinueStmt {
+	return &ContinueStmt{
+		BaseNode: BaseNode{Type: NodeTypeContinueStmt},
+	}
+}
+
+func (c *ContinueStmt) NodeType() NodeType {
+	return c.Type
+}
+
+func (c *ContinueStmt) String() string {
+	return "ContinueStmt"
 }
 
 // ExpressionStmt

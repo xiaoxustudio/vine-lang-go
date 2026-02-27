@@ -231,5 +231,15 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		return ast.NewWaitStmt(p.parseExpression())
 	})
 
+	c.RegisterStmtHandler(token.BREAK, func(p *Parser) any {
+		p.advance() // skip 'break'
+		return ast.NewBreakStmt()
+	})
+
+	c.RegisterStmtHandler(token.CONTINUE, func(p *Parser) any {
+		p.advance() // skip 'continue'
+		return ast.NewContinueStmt()
+	})
+
 	return c
 }

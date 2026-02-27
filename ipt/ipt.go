@@ -53,6 +53,15 @@ func (i *Interpreter) EvalBlockStmt(node *ast.BlockStmt, env *environment.Enviro
 	for _, s := range node.Body {
 		if _, ok := s.(*ast.CommentStmt); !ok {
 			lastResult, err = i.Eval(s, env)
+			// 如果遇到 break 或 continue 语句，立即返回
+			if err != nil {
+				if vErr, ok := err.(verror.InterpreterVError); ok {
+					if vErr.Message == "break" || vErr.Message == "continue" {
+						return nil, err
+					}
+				}
+				return nil, err
+			}
 		}
 	}
 	return lastResult, err
@@ -259,6 +268,14 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 				}
 
 				if err != nil {
+					// 检查是否是 break 或 continue 语句
+					if vErr, ok := err.(verror.InterpreterVError); ok {
+						if vErr.Message == "break" {
+							break
+						} else if vErr.Message == "continue" {
+							continue
+						}
+					}
 					return nil, err
 				}
 			}
@@ -302,6 +319,19 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 		}
 
 		if err != nil {
+			// 检查是否是 break 或 continue 语句
+			if vErr, ok := err.(verror.InterpreterVError); ok {
+				if vErr.Message == "break" {
+					break
+				} else if vErr.Message == "continue" {
+					if n.Update != nil {
+						if _, err := i.Eval(n.Update, loopEnv); err != nil {
+							return nil, err
+						}
+					}
+					continue
+				}
+			}
 			return nil, err
 		}
 
@@ -342,6 +372,9 @@ func isSimpleLoopBody(body *ast.BlockStmt) bool {
 			return false
 		case *ast.ToExpr:
 			// to表达式需要隔离作用域
+			return false
+		case *ast.BreakStmt, *ast.ContinueStmt:
+			// break/continue语句需要隔离作用域
 			return false
 		}
 		// 赋值语句、表达式语句、return语句等不需要隔离作用域
@@ -396,34 +429,76 @@ func (i *Interpreter) EvalSwitchStmt(n *ast.SwitchStmt, env *environment.Environ
 		return nil, err
 	}
 
+	var defaultCase *ast.SwitchCase
+	var matched = false
+
 	for _, c := range n.Cases {
 		caseValue, ok := c.(*ast.SwitchCase)
 		if !ok {
 			return nil, i.Errorf(token.Token{}, "invalid switch case")
 		}
 		if caseValue != nil {
+			// 保存 default case 以便稍后处理
+			if caseValue.IsDefault {
+				defaultCase = caseValue
+				continue
+			}
+
+			// 检查条件是否匹配
 			for _, test := range caseValue.Conds {
 				testVal, err := i.Eval(test, env)
 				if err != nil {
 					return nil, err
-				}
-				if testVal == nil {
-					if caseValue.Body != nil {
-						return i.Eval(caseValue.Body, env)
-					}
 				}
 				ok, err := utils.CompareVal(testVal, token.EQ, condVal)
 				if err != nil {
 					return nil, err
 				}
 				if ok {
-					return i.Eval(caseValue.Body, env)
+					matched = true
+					_, err = i.Eval(caseValue.Body, env)
+					if err != nil {
+						// 检查是否是 break 语句
+						if vErr, ok := err.(verror.InterpreterVError); ok && vErr.Message == "break" {
+							return nil, nil
+						}
+						return nil, err
+					}
+					break
 				}
 			}
 		}
 	}
 
+	// 如果没有匹配的 case，执行 default case
+	if !matched && defaultCase != nil {
+		_, err = i.Eval(defaultCase.Body, env)
+		if err != nil {
+			// 检查是否是 break 语句
+			if vErr, ok := err.(verror.InterpreterVError); ok && vErr.Message == "break" {
+				return nil, nil
+			}
+			return nil, err
+		}
+	}
+
 	return nil, nil
+}
+
+func (i *Interpreter) EvalBreakStmt(n *ast.BreakStmt, env *environment.Environment) (any, error) {
+	// 返回特殊的错误类型来表示 break
+	return nil, verror.InterpreterVError{
+		Message:  "break",
+		Position: token.Token{}.ToPosition(env.FileName),
+	}
+}
+
+func (i *Interpreter) EvalContinueStmt(n *ast.ContinueStmt, env *environment.Environment) (any, error) {
+	// 返回特殊的错误类型来表示 continue
+	return nil, verror.InterpreterVError{
+		Message:  "continue",
+		Position: token.Token{}.ToPosition(env.FileName),
+	}
 }
 
 func (i *Interpreter) EvalTaskStmt(n *ast.TaskStmt, env *environment.Environment) (any, error) {
@@ -1027,6 +1102,10 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 		return i.EvalLambdaFunctionDecl(node.(*ast.LambdaFunctionDecl), env)
 	case ast.NodeTypeReturnStmt:
 		return i.Eval(node.(*ast.ReturnStmt).Value, env)
+	case ast.NodeTypeBreakStmt:
+		return i.EvalBreakStmt(node.(*ast.BreakStmt), env)
+	case ast.NodeTypeContinueStmt:
+		return i.EvalContinueStmt(node.(*ast.ContinueStmt), env)
 	case ast.NodeTypeSwitchStmt:
 		return i.EvalSwitchStmt(node.(*ast.SwitchStmt), env)
 	case ast.NodeTypeTaskStmt:

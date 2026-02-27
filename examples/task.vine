@@ -1,3 +1,5 @@
+use glb pick print
+
 task fn a:
     print("执行函数a")
 end
