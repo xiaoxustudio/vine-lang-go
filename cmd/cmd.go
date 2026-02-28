@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"vine-lang/env"
+	"vine-lang/pprof"
 	"vine-lang/repl"
 	"vine-lang/utils"
 
@@ -14,6 +15,11 @@ import (
 
 const version = "v1.0.1"
 
+var (
+	cpuProfile string
+	memProfile string
+)
+
 var rootCmd = &cobra.Command{
 	Use:     "vine [file]",
 	Short:   "Vine Language",
@@ -21,6 +27,13 @@ var rootCmd = &cobra.Command{
 	Version: version,
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// 启动CPU性能分析
+		if err := pprof.StartCPUProfile(cpuProfile); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v", err)
+			os.Exit(1)
+		}
+		defer pprof.StopCPUProfile()
+
 		// 无参数时启动 REPL
 		if len(args) == 0 {
 			repl.Start()
@@ -29,6 +42,12 @@ var rootCmd = &cobra.Command{
 
 		// 有参数时执行文件或项目
 		RunProjectOrFile(cmd, args)
+
+		// 写入内存性能分析
+		if err := pprof.WriteHeapProfile(memProfile); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v", err)
+			os.Exit(1)
+		}
 	},
 }
 
@@ -102,6 +121,10 @@ func init() {
 	rootCmd.AddCommand(replCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(createCmd)
+
+	// 添加pprof标志
+	rootCmd.PersistentFlags().StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to file")
+	rootCmd.PersistentFlags().StringVar(&memProfile, "memprofile", "", "write memory profile to file")
 
 	// 自定义版本输出
 	rootCmd.SetVersionTemplate(`Vine Language {{.Version}} for xuran`)

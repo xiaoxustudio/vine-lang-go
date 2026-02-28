@@ -1,2 +1,3 @@
 vine-lang.exe
 dist
+*.prof
