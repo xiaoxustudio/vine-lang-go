@@ -33,7 +33,7 @@ func executeCodeForModule(filename string, code string, wk env.Workspace) (any, 
 
 	i := ipt.New(p, e)
 
-	return i.EvalSafe()
+	return i.EvalSafeWithDefer()
 }
 
 // REPL 交互式环境结构
@@ -272,7 +272,7 @@ func (r *REPL) execute(code string) {
 
 	// 解释执行
 	i := ipt.New(p, r.env)
-	result, err := i.EvalSafe()
+	result, err := i.EvalSafeWithDefer()
 
 	if err != nil {
 		fmt.Printf("repl errors: %v\n", err)

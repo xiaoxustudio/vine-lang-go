@@ -46,7 +46,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 			p.advance() // skip 'as'
 			alias := p.parsePrimaryExpression()
 			specifiers = append(specifiers, alias)
-			return ast.NewUseDecl(source, specifiers, token.USE)
+			return ast.NewUseDecl(source, specifiers, token.AS)
 		} else if p.peek().Type == token.PICK {
 			p.advance() // skip 'pick'
 			if p.peek().Type == token.LPAREN {

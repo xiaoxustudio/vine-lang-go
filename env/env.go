@@ -264,15 +264,14 @@ func (e *Environment) ImportModule(name string) (any, error) {
 
 	if existed, ok := e.Get(tk); ok {
 		if _, isMod := existed.(types.LibsModule); isMod {
-			return nil, verror.InterpreterVError{
-				Position: Token{}.ToPosition(e.FileName),
-				Message:  fmt.Sprintf("module %s is already imported", LibsUtils.TrasformPrintString(name)),
-			}
+			// 模块已存在，也在当前环境中定义它
+			e.DefineFast(tk.Value, existed)
+			return existed, nil
 		}
 	}
 	if v, ok := libs.LibsMap[types.LibsKeywords(name)]; ok {
 		e.Define(tk, v)
-		return nil, nil
+		return v, nil
 	}
 
 	wk := e.GetWorkSpace()

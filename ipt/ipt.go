@@ -75,7 +75,7 @@ func (i *Interpreter) EvalUseDecl(n *ast.UseDecl, env *environment.Environment) 
 		return nil, i.Errorf(token.Token{}, "Invalid module name")
 	}
 
-	_, err := env.ImportModule(s.Value)
+	mod, err := env.ImportModule(s.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -88,8 +88,9 @@ func (i *Interpreter) EvalUseDecl(n *ast.UseDecl, env *environment.Environment) 
 			if aliasLit.Value.Type != token.IDENT {
 				return nil, i.Errorf(*aliasLit.Value, "alias must be an identifier")
 			}
-			if mod, exists := env.Get(token.Token{Type: token.IDENT, Value: s.Value}); exists {
-				env.Define(*aliasLit.Value, mod)
+			if mod != nil {
+				// 使用DefineFast直接在当前环境定义别名，避免父环境干扰
+				env.DefineFast(aliasLit.Value.Value, mod)
 			} else {
 				return nil, i.Errorf(token.Token{Type: token.IDENT, Value: s.Value}, "module not found after import")
 			}
@@ -97,18 +98,14 @@ func (i *Interpreter) EvalUseDecl(n *ast.UseDecl, env *environment.Environment) 
 			return nil, i.Errorf(token.Token{}, "invalid alias specifier")
 		}
 	} else if n.Mode == token.PICK {
-		modAny, exists := env.Get(token.Token{Type: token.IDENT, Value: s.Value})
-		if !exists {
-			return nil, i.Errorf(token.Token{Type: token.IDENT, Value: s.Value}, "module not found after import")
-		}
-		if mod, ok := modAny.(types.LibsModule); ok {
+		if mod, ok := mod.(types.LibsModule); ok {
 			for _, sp := range n.Specifiers {
 				if lit, ok := sp.(*ast.Literal); ok {
 					if lit.Value.Type != token.IDENT {
 						return nil, i.Errorf(*lit.Value, "pick target must be an identifier")
 					}
 					if fn, ok := mod.Get(*lit.Value); ok {
-						env.Define(*lit.Value, fn)
+						env.DefineFast(lit.Value.Value, fn)
 					} else {
 						return nil, i.Errorf(*lit.Value, fmt.Sprintf("function %s not found in module %s", lit.Value.Value, s.Value))
 					}
@@ -128,7 +125,7 @@ func (i *Interpreter) EvalUseDecl(n *ast.UseDecl, env *environment.Environment) 
 						local = *us.Remote.Value
 					}
 					if fn, ok := mod.Get(*us.Remote.Value); ok {
-						env.Define(local, fn)
+						env.DefineFast(local.Value, fn)
 					} else {
 						return nil, i.Errorf(*us.Remote.Value, fmt.Sprintf("function %s not found in module %s", us.Remote.Value.Value, s.Value))
 					}
@@ -141,13 +138,15 @@ func (i *Interpreter) EvalUseDecl(n *ast.UseDecl, env *environment.Environment) 
 		}
 	} else if n.Mode == token.USE {
 		if n.Source != nil && n.Source.Value != nil && n.Source.Value.Type == token.STRING {
-			modAny, exists := env.Get(token.Token{Type: token.IDENT, Value: s.Value})
-			if !exists {
-				return nil, i.Errorf(token.Token{Type: token.IDENT, Value: s.Value}, "module not found after import")
-			}
-			if mod, ok := modAny.(types.LibsModule); ok {
-				mod.ForEach(func(tk token.Token, val any) {
-					env.Define(tk, val)
+			// 支持库模块
+			if mod_, ok := mod.(types.LibsModule); ok {
+				mod_.ForEach(func(tk token.Token, val any) {
+					env.DefineFast(tk.Value, val)
+				})
+			} else if modObj, ok := mod.(*store.StoreObject); ok {
+				// 支持自定义模块（通过expose导出的对象）
+				modObj.ForEach(func(tk token.Token, val any) {
+					env.DefineFast(tk.Value, val)
 				})
 			} else {
 				return nil, i.Errorf(token.Token{}, "invalid module type for use")
@@ -1125,19 +1124,32 @@ func (i *Interpreter) EvalLiteral(n *ast.Literal, env *environment.Environment) 
 		return nil, nil
 	case token.IDENT:
 		if v, isGet := env.GetFast(n.Value.Value); isGet {
-			if reflect.ValueOf(v).Kind() == reflect.Func {
+			// 快速检查是否为函数类型，避免reflect调用
+			if _, ok := v.(func(*environment.Environment, ...any) any); ok {
+				return *n.Value, nil
+			}
+			if _, ok := v.(func(any, ...any)); ok {
 				return *n.Value, nil
 			}
 			return v, nil
 		}
 		if v, isGet := env.Get(*n.Value); isGet {
-			if reflect.ValueOf(v).Kind() == reflect.Func {
+			// 快速检查是否为函数类型
+			if _, ok := v.(func(*environment.Environment, ...any) any); ok {
+				return *n.Value, nil
+			}
+			if _, ok := v.(func(any, ...any)); ok {
 				return *n.Value, nil
 			}
 			return v, nil
 		}
+		// 检查是否为库关键字
 		ok := types.LibsKeywords(n.Value.Value)
 		if ok.IsValidLibsKeyword() {
+			// 尝试获取模块对象
+			if v, isGet := env.Get(*n.Value); isGet {
+				return v, nil
+			}
 			return *n.Value, nil
 		}
 
@@ -1212,16 +1224,6 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 }
 
 func (i *Interpreter) EvalSafe() (any, error) {
-	defer func() {
-		if r := recover(); r != nil {
-			if parseErr, ok := r.(verror.InterpreterVError); ok {
-				i.errors = append(i.errors, parseErr)
-				fmt.Printf("Runtime Error: %v\n", parseErr)
-			} else {
-				panic(r)
-			}
-		}
-	}()
 	ast := i.p.ParseProgram()
 	v, e := i.Eval(ast, i.env)
 	if e != nil {
@@ -1235,4 +1237,18 @@ func (i *Interpreter) EvalSafe() (any, error) {
 		return types.NewUserModule(i.env.FileName, i.env.Exports), nil
 	}
 	return v, e
+}
+
+func (i *Interpreter) EvalSafeWithDefer() (any, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if parseErr, ok := r.(verror.InterpreterVError); ok {
+				i.errors = append(i.errors, parseErr)
+				fmt.Printf("Runtime Error: %v\n", parseErr)
+			} else {
+				panic(r)
+			}
+		}
+	}()
+	return i.EvalSafe()
 }
