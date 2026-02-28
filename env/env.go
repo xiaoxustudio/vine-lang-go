@@ -34,7 +34,7 @@ func ExecuteCode(filename string, code string, wk Workspace) (any, error) {
 type Environment struct {
 	types.Scope
 	parent     *Environment
-	store      map[Token]any
+	store      map[string]any
 	nameMap    map[string]Token
 	consts     map[string]struct{}
 	FileName   string
@@ -47,7 +47,7 @@ type Environment struct {
 func New(workspace Workspace) *Environment {
 	e := &Environment{
 		parent:    nil,
-		store:     make(map[Token]any),
+		store:     make(map[string]any),
 		nameMap:   make(map[string]Token), // for faster lookup
 		consts:    make(map[string]struct{}),
 		WorkSpace: workspace,
@@ -72,8 +72,8 @@ func (e *Environment) Link(parent *Environment) {
 }
 
 func (e *Environment) Get(name Token) (any, bool) {
-	if tk, exists := e.nameMap[name.Value]; exists {
-		return e.store[tk], true
+	if val, exists := e.store[name.Value]; exists {
+		return val, true
 	}
 	if e.parent != nil {
 		return e.parent.Get(name)
@@ -87,8 +87,8 @@ func (e *Environment) Get(name Token) (any, bool) {
 
 // GetFast 快速获取变量值，仅在当前环境查找，不遍历父环境
 func (e *Environment) GetFast(name string) (any, bool) {
-	if tk, exists := e.nameMap[name]; exists {
-		return e.store[tk], true
+	if val, exists := e.store[name]; exists {
+		return val, true
 	}
 	return nil, false
 }
@@ -113,7 +113,7 @@ func (e *Environment) Set(name Token, val any) {
 				Message:  fmt.Sprintf("constant %s cannot be reassigned", LibsUtils.TrasformPrintString(name.Value)),
 			})
 		}
-		theEnv.store[tk] = val
+		theEnv.store[name.Value] = val
 	} else {
 		if e.MountScope != nil {
 			e.MountScope.Define(name, val)
@@ -128,14 +128,9 @@ func (e *Environment) Set(name Token, val any) {
 
 // SetFast 快速设置变量值，用于已知变量存在且不是常量的情况
 // 仅在当前环境查找，不遍历父环境
+// 使用字符串作为map key以减少哈希计算开销
 func (e *Environment) SetFast(name string, val any) {
-	if tk, exists := e.nameMap[name]; exists {
-		e.store[tk] = val
-	} else {
-		// 如果当前环境不存在，则定义新变量
-		e.store[Token{Type: token.IDENT, Value: name}] = val
-		e.nameMap[name] = Token{Type: token.IDENT, Value: name}
-	}
+	e.store[name] = val
 }
 
 func (e *Environment) Define(name Token, val any) error {
@@ -146,7 +141,7 @@ func (e *Environment) Define(name Token, val any) error {
 			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
 		}
 	} else {
-		e.store[name] = val
+		e.store[name.Value] = val
 		e.nameMap[name.Value] = name
 	}
 	return nil
@@ -154,9 +149,8 @@ func (e *Environment) Define(name Token, val any) error {
 
 // DefineFast 快速定义变量，不检查是否已存在
 func (e *Environment) DefineFast(name string, val any) {
-	tk := Token{Type: token.IDENT, Value: name}
-	e.store[tk] = val
-	e.nameMap[name] = tk
+	e.store[name] = val
+	e.nameMap[name] = Token{Type: token.IDENT, Value: name}
 }
 
 // 定义临时参数
@@ -174,20 +168,20 @@ func (e *Environment) DefineConst(name Token, val any) {
 			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
 		})
 	} else {
-		e.store[name] = val
+		e.store[name.Value] = val
 		e.nameMap[name.Value] = name
 		e.consts[name.Value] = struct{}{}
 	}
 }
 
 func (e *Environment) Delete(name Token) {
-	delete(e.store, name)
+	delete(e.store, name.Value)
 	delete(e.nameMap, name.Value)
 }
 
 func (e *Environment) Print() {
 	for k, v := range e.store {
-		println(k.String(), LibsUtils.TrasformPrintString(v))
+		println(k, LibsUtils.TrasformPrintString(v))
 	}
 }
 

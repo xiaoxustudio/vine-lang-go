@@ -162,7 +162,8 @@ func (i *Interpreter) EvalVariableDecl(n *ast.VariableDecl, env *environment.Env
 	if n.IsConst {
 		env.DefineConst(*n.Name.Value, val)
 	} else {
-		env.DefineFast(n.Name.Value.Value, val)
+		// 使用DefineFast直接设置，避免重复检查
+		env.SetFast(n.Name.Value.Value, val)
 	}
 	return val, err
 }
@@ -261,7 +262,7 @@ func (i *Interpreter) EvalForStmt(n *ast.ForStmt, env *environment.Environment) 
 				} else {
 					// 复杂循环体需要隔离作用域
 					bodyEnv := environment.NewPooled(env.FileName)
-					bodyEnv.Define(nameToken, valueOf.Index(index).Interface())
+					bodyEnv.SetFast(nameToken.Value, valueOf.Index(index).Interface())
 					bodyEnv.Link(loopEnv)
 					_, err = i.Eval(&n.Body, bodyEnv)
 					bodyEnv.Release()
@@ -685,6 +686,24 @@ func (i *Interpreter) EvalCompareExpr(n *ast.CompareExpr, env *environment.Envir
 				return left >= right, nil
 			}
 		}
+		// 快速路径处理整数和浮点数的混合比较
+		if right, ok := rightRaw.(float64); ok {
+			leftFloat := float64(left)
+			switch n.Operator.Type {
+			case token.EQ:
+				return leftFloat == right, nil
+			case token.NOT_EQ:
+				return leftFloat != right, nil
+			case token.LESS:
+				return leftFloat < right, nil
+			case token.LESS_EQ:
+				return leftFloat <= right, nil
+			case token.GREATER:
+				return leftFloat > right, nil
+			case token.GREATER_EQ:
+				return leftFloat >= right, nil
+			}
+		}
 	}
 
 	// 快速路径处理常见的浮点数比较
@@ -703,6 +722,24 @@ func (i *Interpreter) EvalCompareExpr(n *ast.CompareExpr, env *environment.Envir
 				return left > right, nil
 			case token.GREATER_EQ:
 				return left >= right, nil
+			}
+		}
+		// 快速路径处理浮点数和整数的混合比较
+		if right, ok := rightRaw.(int64); ok {
+			rightFloat := float64(right)
+			switch n.Operator.Type {
+			case token.EQ:
+				return left == rightFloat, nil
+			case token.NOT_EQ:
+				return left != rightFloat, nil
+			case token.LESS:
+				return left < rightFloat, nil
+			case token.LESS_EQ:
+				return left <= rightFloat, nil
+			case token.GREATER:
+				return left > rightFloat, nil
+			case token.GREATER_EQ:
+				return left >= rightFloat, nil
 			}
 		}
 	}
@@ -741,6 +778,22 @@ func (i *Interpreter) EvalBinaryExpr(n *ast.BinaryExpr, env *environment.Environ
 				return float64(left) / float64(right), nil
 			}
 		}
+		// 快速路径处理整数和浮点数的混合运算
+		if right, ok := rightRaw.(float64); ok {
+			switch n.Operator.Type {
+			case token.PLUS:
+				return float64(left) + right, nil
+			case token.MINUS:
+				return float64(left) - right, nil
+			case token.MUL:
+				return float64(left) * right, nil
+			case token.DIV:
+				if right == 0 {
+					return nil, i.Errorf(n.Operator, "division by zero")
+				}
+				return float64(left) / right, nil
+			}
+		}
 	}
 
 	// 快速路径处理常见的浮点数运算
@@ -758,6 +811,22 @@ func (i *Interpreter) EvalBinaryExpr(n *ast.BinaryExpr, env *environment.Environ
 					return nil, i.Errorf(n.Operator, "division by zero")
 				}
 				return left / right, nil
+			}
+		}
+		// 快速路径处理浮点数和整数的混合运算
+		if right, ok := rightRaw.(int64); ok {
+			switch n.Operator.Type {
+			case token.PLUS:
+				return left + float64(right), nil
+			case token.MINUS:
+				return left - float64(right), nil
+			case token.MUL:
+				return left * float64(right), nil
+			case token.DIV:
+				if right == 0 {
+					return nil, i.Errorf(n.Operator, "division by zero")
+				}
+				return left / float64(right), nil
 			}
 		}
 	}

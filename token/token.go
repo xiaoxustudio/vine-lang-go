@@ -129,6 +129,7 @@ type Token struct {
 	Value  string // 字符串原始值
 	Line   int    // 行号
 	Column int    // 列号
+	hash   uint64 // 缓存的哈希值，用于map key
 }
 
 func NewToken(t TokenType, v rune, col, line int) Token {

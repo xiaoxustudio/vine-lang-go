@@ -5,7 +5,7 @@ import "sync"
 var envPool = sync.Pool{
 	New: func() any {
 		return &Environment{
-			store:   make(map[Token]any, 8),
+			store:   make(map[string]any, 8),
 			nameMap: make(map[string]Token, 8),
 			consts:  make(map[string]struct{}, 8),
 		}

@@ -12,13 +12,13 @@ import (
 
 type StoreObject struct {
 	parent  *StoreObject
-	store   map[token.Token]any
+	store   map[string]any
 	nameMap map[string]token.Token
 }
 
 func NewStoreObject() *StoreObject {
 	return &StoreObject{
-		store:   make(map[token.Token]any),
+		store:   make(map[string]any),
 		nameMap: make(map[string]token.Token),
 		parent:  nil,
 	}
@@ -28,7 +28,7 @@ func NewStoreObjectWithGoStruct(val any) *StoreObject {
 	t := reflect.TypeOf(val)
 	v := reflect.ValueOf(val)
 
-	var store = make(map[token.Token]any)
+	var store = make(map[string]any)
 
 	originalType := t
 
@@ -46,14 +46,14 @@ func NewStoreObjectWithGoStruct(val any) *StoreObject {
 		} else if fieldValue.Kind() == reflect.Struct {
 			NewStoreObjectWithGoStruct(fieldValue.Interface())
 		} else {
-			store[token.Token{Type: token.IDENT, Value: field.Name}] = fieldValue.Interface()
+			store[field.Name] = fieldValue.Interface()
 		}
 	}
 	methodType := originalType
 	// 遍历方法
 	for i := 0; i < methodType.NumMethod(); i++ {
 		method := methodType.Method(i)
-		store[token.Token{Type: token.IDENT, Value: method.Name}] = func(_ ...any) any {
+		store[method.Name] = func(_ ...any) any {
 			mType := method.Func.Type()
 			numIn := mType.NumIn()
 			args := make([]reflect.Value, numIn)
@@ -72,19 +72,20 @@ func NewStoreObjectWithGoStruct(val any) *StoreObject {
 
 	s := &StoreObject{
 		store:   store,
-		nameMap: LibsUtils.MapKeysToToken(store),
+		nameMap: make(map[string]token.Token),
 		parent:  nil,
+	}
+
+	// 重建nameMap
+	for k := range store {
+		s.nameMap[k] = token.Token{Type: token.IDENT, Value: k}
 	}
 
 	return s
 }
 
 func StoreObjectToMap(e *StoreObject) map[string]any {
-	res := make(map[string]any)
-	for k, v := range e.store {
-		res[k.Value] = v
-	}
-	return res
+	return e.store
 }
 
 func StoreObjectToReadableJSON(e *StoreObject) string {
@@ -147,17 +148,17 @@ func toJSONValue(val any) any {
 func storeObjectToJSONMap(e *StoreObject) map[string]any {
 	res := make(map[string]any)
 	for k, v := range e.store {
-		if k.Value == "__proto__" {
+		if k == "__proto__" {
 			continue
 		}
-		res[k.Value] = toJSONValue(v)
+		res[k] = toJSONValue(v)
 	}
 	return res
 }
 
 func (s *StoreObject) Get(name token.Token) (any, bool) {
-	if tk, exists := s.nameMap[name.Value]; exists {
-		return s.store[tk], true
+	if val, exists := s.store[name.Value]; exists {
+		return val, true
 	}
 	if s.parent != nil {
 		return s.parent.Get(name)
@@ -178,7 +179,7 @@ func (e *StoreObject) Lookup(name token.Token) (StoreObject, token.Token) {
 func (e *StoreObject) Set(name token.Token, val any) {
 	theEnv, tk := e.Lookup(name)
 	if !tk.IsEmpty() {
-		theEnv.store[tk] = val
+		theEnv.store[name.Value] = val
 	} else {
 		panic(verror.InterpreterVError{
 			Position: name.ToPosition(""),
@@ -195,7 +196,7 @@ func (e *StoreObject) Define(name token.Token, val any) error {
 			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
 		}
 	} else {
-		e.store[name] = val
+		e.store[name.Value] = val
 		e.nameMap[name.Value] = name
 	}
 	return nil
@@ -203,13 +204,13 @@ func (e *StoreObject) Define(name token.Token, val any) error {
 
 func (e *StoreObject) Print() {
 	for k, v := range e.store {
-		println(k.String(), LibsUtils.TrasformPrintString(v))
+		println(k, LibsUtils.TrasformPrintString(v))
 	}
 }
 
 func (e *StoreObject) ForEach(fn func(tk token.Token, val any)) {
 	for k, v := range e.store {
-		fn(k, v)
+		fn(token.Token{Type: token.IDENT, Value: k}, v)
 	}
 }
 
