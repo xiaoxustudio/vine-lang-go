@@ -72,40 +72,28 @@ func TestExamplesRecursive(t *testing.T) {
 }
 
 // testVineFile 测试单个.vine文件
-func testVineFile(t *testing.T, filepath string) {
+func testVineFile(t *testing.T, filepath_ string) {
 	// 读取文件内容
-	content, err := os.ReadFile(filepath)
+	content, err := os.ReadFile(filepath_)
 	if err != nil {
-		t.Fatalf("Failed to read file %s: %v", filepath, err)
+		t.Fatalf("Failed to read file %s: %v", filepath_, err)
 	}
+
+	// 获取文件所在的目录
+	fileDir := filepath.Dir(filepath_)
 
 	// 创建工作区
 	wk := &env.Workspace{
 		Root:     ".",
-		BasePath: ".",
-		FileName: filepath,
+		BasePath: fileDir,
+		FileName: filepath_,
 	}
 
 	// 执行代码
-	_, err = executeCode(filepath, string(content), *wk)
+	_, err = executeCode(filepath_, string(content), *wk)
 	if err != nil {
-		t.Errorf("Failed to execute %s: %v", filepath, err)
+		t.Errorf("Failed to execute %s: %v", filepath_, err)
 	}
-}
-
-// executeCode 执行vine代码
-func executeCode(filename string, code string, wk env.Workspace) (any, error) {
-	lex := lexer.New(filename, code)
-	lex.Parse()
-
-	p := parser.CreateParser(lex)
-
-	e := env.New(wk)
-	e.FileName = filename
-
-	i := ipt.New(p, e)
-
-	return i.EvalSafe()
 }
 
 // BenchmarkExamples 基准测试examples文件夹下的所有.vine文件
@@ -167,4 +155,19 @@ func benchmarkVineFile(b *testing.B, filepath string) {
 			b.Errorf("Failed to execute %s: %v", filepath, err)
 		}
 	}
+}
+
+// executeCode 执行vine代码
+func executeCode(filename string, code string, wk env.Workspace) (any, error) {
+	lex := lexer.New(filename, code)
+	lex.Parse()
+
+	p := parser.CreateParser(lex)
+
+	e := env.New(wk)
+	e.FileName = filename
+
+	i := ipt.New(p, e)
+
+	return i.EvalSafe()
 }
