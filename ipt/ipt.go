@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"slices"
 	"vine-lang/ast"
+	"vine-lang/compiler"
 	environment "vine-lang/env"
 	"vine-lang/object/store"
 	"vine-lang/object/task"
@@ -13,6 +14,7 @@ import (
 	"vine-lang/types"
 	"vine-lang/utils"
 	"vine-lang/verror"
+	"vine-lang/vm"
 )
 
 type Interpreter struct {
@@ -1225,10 +1227,24 @@ func (i *Interpreter) Eval(node ast.Node, env *environment.Environment) (any, er
 
 func (i *Interpreter) EvalSafe() (any, error) {
 	ast := i.p.ParseProgram()
-	v, e := i.Eval(ast, i.env)
-	if e != nil {
-		return nil, e
+	// v, e := i.Eval(ast, i.env)
+	// if e != nil {
+	// 	return nil, e
+	// }
+
+	// 编译字节码
+	c := compiler.NewCompiler()
+	e := c.Compile(ast)
+	// 反射字节码
+	println(c.Dismassemble())
+	vv := vm.NewVM(c)
+
+	v, err := vv.Run()
+	if err != nil {
+		return nil, err
 	}
+
+	println("vm 返回:", fmt.Sprintf("%v", v))
 
 	// 保证所有任务都执行完毕
 	task.WaitAll()
@@ -1236,6 +1252,7 @@ func (i *Interpreter) EvalSafe() (any, error) {
 	if i.env.Exports != nil {
 		return types.NewUserModule(i.env.FileName, i.env.Exports), nil
 	}
+
 	return v, e
 }
 
