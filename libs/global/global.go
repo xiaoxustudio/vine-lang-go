@@ -33,7 +33,7 @@ func (g *GlobalModule) Name() string {
 /* FN */
 
 // 打印
-func Print(env any, rangeArgs ...any) {
+func Print(rangeArgs ...any) {
 	if len(rangeArgs) == 0 {
 		return
 	}
@@ -64,7 +64,7 @@ func Print(env any, rangeArgs ...any) {
 	fmt.Println()
 }
 
-func PrintWithColor(env any, rangeArgs ...any) {
+func PrintWithColor(rangeArgs ...any) {
 	if len(rangeArgs) == 0 {
 		return
 	}
@@ -76,6 +76,6 @@ func PrintWithColor(env any, rangeArgs ...any) {
 }
 
 // 获取对象内存地址
-func Id(env any, val any) any {
+func Id(val any) any {
 	return fmt.Sprintf("%p", &val)
 }

@@ -37,6 +37,16 @@ func (c *Compiler) GetConstantRaw() []any {
 	return c.constants
 }
 
+func (c *Compiler) NewScope(e env.Environment) *CompilationScope {
+	scope := &CompilationScope{
+		instructions: bytecode.Instructions{},
+		env:          e,
+	}
+	c.scopes = append(c.scopes, scope)
+	c.scopeIndex++
+	return scope
+}
+
 func (c *Compiler) Compile(node ast.Node) error {
 	return c.CallStmtHandler(node)
 }

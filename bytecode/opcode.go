@@ -17,8 +17,11 @@ const (
 	OpMinus
 	OpMul
 	OpDiv
-	OpPop
+	OpPop // 弹出栈顶元素
 	OpJump
+
+	OpIncrement // 自增
+	OpDecrement // 自减
 
 	/* 操作 */
 	OpSetGlobal

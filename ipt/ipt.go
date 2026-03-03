@@ -1233,11 +1233,12 @@ func (i *Interpreter) EvalSafe() (any, error) {
 	// }
 
 	// 编译字节码
-	c := compiler.NewCompiler()
+	c := compiler.NewCompiler(i.env)
 	e := c.Compile(ast)
 	// 反射字节码
 	println(c.Dismassemble())
-	vv := vm.NewVM(c)
+	println("编译成功，开始vm执行")
+	vv := vm.NewVM(c, i.env)
 
 	v, err := vv.Run()
 	if err != nil {

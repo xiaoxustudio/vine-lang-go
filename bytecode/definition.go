@@ -62,6 +62,8 @@ func Disassemble(ins Instructions, constants []any) []string {
 			} else {
 				instructions = append(instructions, fmt.Sprintf("%04d %s(%d) [ERROR: constant index out of range]", i, def.Instruction, idx))
 			}
+		case OpGetGlobal:
+			instructions = append(instructions, fmt.Sprintf("%04d %s %v", i, def.Instruction, constants[operands[0]]))
 		default:
 			if len(operands) > 0 {
 				instructions = append(instructions, fmt.Sprintf("%04d %s %v", i, def.Instruction, operands))

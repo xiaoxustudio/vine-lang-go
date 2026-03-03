@@ -3,6 +3,7 @@ package vm
 import (
 	"errors"
 	"vine-lang/bytecode"
+	"vine-lang/env"
 )
 
 type VMFunc func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error)
@@ -17,6 +18,7 @@ type VM struct {
 
 	globals  []any // 全局变量
 	handlers map[bytecode.Opcode]VMFunc
+	env      *env.Environment // 环境引用
 }
 
 type Frame struct {
