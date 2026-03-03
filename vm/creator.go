@@ -585,8 +585,8 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 				argValue := v.stack[v.sp-argCount+i]
 				v.stack[newFrame.basePointer+1+i] = argValue // 参数从函数对象后面开始
 			}
-			// 清除栈上的函数和参数
-			// 设置栈指针到参数之后的位置，避免覆盖参数
+			// 调整栈指针，指向参数之后的位置
+			// 这样函数执行时可以从这个位置开始使用栈
 			v.sp = newFrame.basePointer + argCount + 1
 		case func(...any) (any, error):
 			// 处理Go函数调用
@@ -604,6 +604,9 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 			if result != nil {
 				v.push(result)
 			}
+			// 更新指令指针
+			frame.ip += 3
+			return result, nil
 		default:
 			// 尝试使用reflect调用函数
 			if reflect.TypeOf(fn).Kind() != reflect.Func {
@@ -620,6 +623,9 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 			if len(results) > 0 {
 				v.push(results[0].Interface())
 			}
+			// 更新指令指针
+			frame.ip += 3
+			return nil, nil
 		}
 
 		frame.ip += 3
@@ -641,11 +647,9 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 			return returnValue, nil
 		}
 
-		// 恢复前一帧的栈指针
-		prevFrame := v.currentFrame()
-		v.sp = prevFrame.basePointer
+		v.sp = frame.basePointer
 
-		// 将返回值压入栈
+		// 将返回值压入上一个帧的栈
 		if returnValue != nil {
 			v.push(returnValue)
 		}

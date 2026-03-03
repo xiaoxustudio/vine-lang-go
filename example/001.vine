@@ -5,4 +5,5 @@ fn b_fn(val):
     return val # 返回值
 end
 
-b_fn("hello world")
+print(b_fn)
+print(b_fn("你好"))
