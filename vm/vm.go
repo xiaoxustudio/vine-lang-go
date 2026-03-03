@@ -17,6 +17,7 @@ type VM struct {
 	frameIndex int
 
 	globals  []any // 全局变量
+	locals   []any // 局部变量
 	handlers map[bytecode.Opcode]VMFunc
 	env      *env.Environment // 环境引用
 }

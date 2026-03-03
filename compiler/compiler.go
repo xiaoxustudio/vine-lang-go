@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"vine-lang/ast"
 	"vine-lang/bytecode"
@@ -95,6 +96,18 @@ func (c *Compiler) CallStmtHandler(node ast.Node) (any, error) {
 
 // 添加常量，并返回常量的位置
 func (c *Compiler) AddConstant(constant any) int {
+	// 检查常量是否已经存在于常量池中
+	for i, c := range c.constants {
+		// 对于字符串类型，使用字符串比较
+		if str, ok := constant.(string); ok {
+			if existingStr, ok := c.(string); ok && existingStr == str {
+				return i
+			}
+		} else if reflect.DeepEqual(c, constant) {
+			return i
+		}
+	}
+	// 常量不存在，添加到常量池
 	c.constants = append(c.constants, constant)
 	return len(c.constants) - 1
 }

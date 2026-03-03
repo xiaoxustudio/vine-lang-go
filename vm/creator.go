@@ -168,6 +168,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		frames:     make([]*Frame, 1),
 		frameIndex: 0,
 		globals:    make([]any, 256),
+		locals:     make([]any, 256),
 		handlers:   make(map[bytecode.Opcode]VMFunc),
 		env:        env,
 	}
@@ -528,6 +529,33 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		return nil, nil
 	})
 
+	v.RegisterOpenCodeHandler(bytecode.OpLoop, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取跳转偏移量（有符号整数）
+		offset := int16(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		// 跳转到循环开始位置
+		frame.ip += int(offset)
+		return nil, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpBreak, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 跳出循环，直接跳转到循环结束位置
+		// 这里需要实现循环栈来跟踪循环位置
+		// 暂时简单地跳过循环体
+		frame.ip += 1
+		return nil, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpContinue, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 跳到下一次迭代，跳转到循环开始位置
+		// 这里需要实现循环栈来跟踪循环位置
+		// 暂时简单地跳过循环体
+		frame.ip += 1
+		return nil, nil
+	})
+
 	v.RegisterOpenCodeHandler(bytecode.OpSetGlobal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
 
@@ -539,10 +567,18 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		value := v.pop()
 		// 从常量池中获取变量名
 		varName := v.constants[globalIndex].(string)
-		// 使用 Define 方法来定义全局变量
-		err := v.env.Define(token.Token{Type: token.IDENT, Value: varName}, value)
-		if err != nil {
-			return nil, err
+		// 检查变量是否已存在
+		nameToken := token.Token{Type: token.IDENT, Value: varName}
+		_, exists := v.env.Get(nameToken)
+		if exists {
+			// 变量已存在，更新其值
+			v.env.Set(nameToken, value)
+		} else {
+			// 变量不存在，定义它
+			err := v.env.Define(nameToken, value)
+			if err != nil {
+				return nil, err
+			}
 		}
 		frame.ip += 3
 		return value, nil
@@ -589,10 +625,11 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		frame := v.currentFrame()
 
 		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
-		// 从栈中获取局部变量
-		// basePointer指向函数对象的位置
-		// 参数从basePointer+1开始
-		value := v.stack[frame.basePointer+1+localIndex]
+		// 从locals数组中获取局部变量
+		if localIndex >= len(v.locals) {
+			return nil, fmt.Errorf("local index %d out of range", localIndex)
+		}
+		value := v.locals[localIndex]
 		// 压入栈
 		v.push(value)
 		frame.ip += 3
@@ -606,9 +643,10 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		// 从栈中弹出值
 		value := v.pop()
 		// 设置局部变量
-		// basePointer指向函数对象的位置
-		// 参数从basePointer+1开始
-		v.stack[frame.basePointer+1+localIndex] = value
+		if localIndex >= len(v.locals) {
+			return nil, fmt.Errorf("local index %d out of range", localIndex)
+		}
+		v.locals[localIndex] = value
 		frame.ip += 3
 		return value, nil
 	})

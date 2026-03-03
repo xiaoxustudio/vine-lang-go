@@ -21,6 +21,9 @@ const (
 	OpJump
 	OpJumpIfFalse // 条件为假时跳转
 	OpJumpIfTrue  // 条件为真时跳转
+	OpLoop      // 循环跳转（跳转到循环开始）
+	OpBreak     // 跳出循环
+	OpContinue  // 跳到下一次迭代
 
 	OpIncrement // 自增
 	OpDecrement // 自减
