@@ -14,33 +14,6 @@ import (
 	"vine-lang/types"
 )
 
-// isTruthy 判断值是否为真
-func isTruthy(value any) bool {
-	switch v := value.(type) {
-	case bool:
-		return v
-	case int64:
-		return v != 0
-	case float64:
-		return v != 0
-	case string:
-		return v != ""
-	case nil:
-		return false
-	default:
-		// 对于其他类型，使用反射判断
-		rv := reflect.ValueOf(value)
-		switch rv.Kind() {
-		case reflect.Array, reflect.Slice, reflect.Map:
-			return rv.Len() > 0
-		case reflect.Ptr:
-			return !rv.IsNil()
-		default:
-			return true
-		}
-	}
-}
-
 // compareValues 比较两个值，返回比较结果
 func compareValues(left, right any, operator string) bool {
 	// 快速路径：使用类型开关

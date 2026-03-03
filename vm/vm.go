@@ -1,10 +1,31 @@
 package vm
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"vine-lang/bytecode"
 	"vine-lang/env"
 )
+
+// isTruthy 判断值是否为真
+func isTruthy(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	case int64:
+		return v != 0
+	case float64:
+		return v != 0
+	case string:
+		return v != ""
+	case nil:
+		return false
+	default:
+		// 对于其他类型，假设为真
+		return true
+	}
+}
 
 type VMFunc func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error)
 
@@ -43,21 +64,229 @@ func (v *VM) CallOpenCodeHandler(op bytecode.Opcode, ins bytecode.Instructions) 
 func (v *VM) Run() (any, error) {
 	var result any
 	for v.frameIndex >= 0 {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 检查是否超出指令范围
 		if frame.ip >= len(frame.fn.Instructions) {
 			break
 		}
 		opcode := bytecode.Opcode(frame.fn.Instructions[frame.ip])
-		handler := v.handlers[opcode]
-		if handler == nil {
-			return nil, errors.New("unknown opcode")
+
+		switch opcode {
+		case bytecode.OpConstant:
+			constIndex := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			if constIndex >= len(v.constants) {
+				return nil, fmt.Errorf("constant index %d out of range", constIndex)
+			}
+			constant := v.constants[constIndex]
+			v.stack[v.sp] = constant
+			v.sp++
+			frame.ip += 3
+			result = constant
+		case bytecode.OpGetLocal:
+			localIndex := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			if localIndex >= len(v.locals) {
+				return nil, fmt.Errorf("local index %d out of range", localIndex)
+			}
+			value := v.locals[localIndex]
+			v.stack[v.sp] = value
+			v.sp++
+			frame.ip += 3
+			result = value
+		case bytecode.OpSetLocal:
+			localIndex := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			if localIndex >= len(v.locals) {
+				return nil, fmt.Errorf("local index %d out of range", localIndex)
+			}
+			v.sp--
+			v.locals[localIndex] = v.stack[v.sp]
+			frame.ip += 3
+		case bytecode.OpPlus, bytecode.OpMinus, bytecode.OpMul, bytecode.OpDiv:
+			v.sp -= 2
+			right := v.stack[v.sp+1]
+			left := v.stack[v.sp]
+			var calcResult any
+			var err error
+
+			switch opcode {
+			case bytecode.OpPlus:
+				switch left := left.(type) {
+				case int64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left + right
+					case float64:
+						calcResult = float64(left) + right
+					default:
+						err = errors.New("unsupported types for addition")
+					}
+				case float64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left + float64(right)
+					case float64:
+						calcResult = left + right
+					default:
+						err = errors.New("unsupported types for addition")
+					}
+				default:
+					err = errors.New("unsupported types for addition")
+				}
+			case bytecode.OpMinus:
+				switch left := left.(type) {
+				case int64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left - right
+					case float64:
+						calcResult = float64(left) - right
+					default:
+						err = errors.New("unsupported types for subtraction")
+					}
+				case float64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left - float64(right)
+					case float64:
+						calcResult = left - right
+					default:
+						err = errors.New("unsupported types for subtraction")
+					}
+				default:
+					err = errors.New("unsupported types for subtraction")
+				}
+			case bytecode.OpMul:
+				switch left := left.(type) {
+				case int64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left * right
+					case float64:
+						calcResult = float64(left) * right
+					default:
+						err = errors.New("unsupported types for multiplication")
+					}
+				case float64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left * float64(right)
+					case float64:
+						calcResult = left * right
+					default:
+						err = errors.New("unsupported types for multiplication")
+					}
+				default:
+					err = errors.New("unsupported types for multiplication")
+				}
+			default: // OpDiv
+				switch right := right.(type) {
+				case int64:
+					if right == 0 {
+						return nil, errors.New("division by zero")
+					}
+				case float64:
+					if right == 0 {
+						return nil, errors.New("division by zero")
+					}
+				}
+				switch left := left.(type) {
+				case int64:
+					switch right := right.(type) {
+					case int64:
+						if left%right == 0 {
+							calcResult = left / right
+						} else {
+							calcResult = float64(left) / float64(right)
+						}
+					case float64:
+						calcResult = float64(left) / right
+					default:
+						err = errors.New("unsupported types for division")
+					}
+				case float64:
+					switch right := right.(type) {
+					case int64:
+						calcResult = left / float64(right)
+					case float64:
+						calcResult = left / right
+					default:
+						err = errors.New("unsupported types for division")
+					}
+				default:
+					err = errors.New("unsupported types for division")
+				}
+			}
+
+			if err != nil {
+				return nil, err
+			}
+			v.stack[v.sp] = calcResult
+			v.sp++
+			frame.ip += 1
+			result = calcResult
+		case bytecode.OpLessThan:
+			v.sp -= 2
+			right := v.stack[v.sp+1]
+			left := v.stack[v.sp]
+			var cmpResult bool
+
+			switch left := left.(type) {
+			case int64:
+				switch right := right.(type) {
+				case int64:
+					cmpResult = left < right
+				case float64:
+					cmpResult = float64(left) < right
+				}
+			case float64:
+				switch right := right.(type) {
+				case int64:
+					cmpResult = left < float64(right)
+				case float64:
+					cmpResult = left < right
+				}
+			}
+
+			v.stack[v.sp] = cmpResult
+			v.sp++
+			frame.ip += 1
+			result = cmpResult
+		case bytecode.OpJumpIfFalse:
+			v.sp--
+			condition := v.stack[v.sp]
+			offset := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			if !isTruthy(condition) {
+				frame.ip += offset
+			} else {
+				frame.ip += 3
+			}
+		case bytecode.OpLoop:
+			offset := int16(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			frame.ip += int(offset)
+		case bytecode.OpIncrement:
+			v.sp--
+			val := v.stack[v.sp]
+			switch val := val.(type) {
+			case int64:
+				v.stack[v.sp] = val + 1
+			case float64:
+				v.stack[v.sp] = val + 1
+			}
+			v.sp++
+			frame.ip += 1
+		case bytecode.OpPop:
+			v.sp--
+			frame.ip += 1
+		default:
+			handler := v.handlers[opcode]
+			if handler == nil {
+				return nil, errors.New("unknown opcode")
+			}
+			r, err := handler(v, opcode, frame.fn.Instructions)
+			if err != nil {
+				return nil, err
+			}
+			result = r
 		}
-		r, err := handler(v, opcode, frame.fn.Instructions)
-		if err != nil {
-			return nil, err
-		}
-		result = r
 	}
 	return result, nil
 }
