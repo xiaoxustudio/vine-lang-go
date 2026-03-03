@@ -24,6 +24,10 @@ var definitions = map[Opcode]*Definition{
 	OpReturn:    {"OpReturn", nil, OpReturn},
 	OpIndex:     {"OpIndex", nil, OpIndex},
 	OpGetMember: {"OpGetMember", []int{2}, OpGetMember},
+	OpIncrement: {"OpIncrement", nil, OpIncrement},
+	OpDecrement: {"OpDecrement", nil, OpDecrement},
+	OpArray:     {"OpArray", []int{2}, OpArray},
+	OpConst:     {"OpConst", nil, OpConst},
 }
 
 func Lookup(op Opcode, constants []any) (*Definition, error) {

@@ -30,6 +30,10 @@ const (
 	OpReturn
 	OpIndex // 索引
 	OpGetMember
+
+	/* 结构 */
+	OpArray
+	OpConst
 )
 
 type Instructions []byte // 单个指令

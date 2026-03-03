@@ -1,0 +1,7 @@
+use glb as tglb
+use glb pick print as p
+use glb pick print
+
+tglb.print("alias ok")
+print("pick ok", 111)
+p("pick alias ok", 222)
