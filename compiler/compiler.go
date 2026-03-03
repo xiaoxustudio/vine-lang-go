@@ -9,7 +9,7 @@ import (
 	"vine-lang/object/store"
 )
 
-type compileFunc func(node ast.Node) error
+type compileFunc func(node ast.Node) (any, error)
 
 type Compiler struct {
 	handlers     map[ast.NodeType]compileFunc // 编译器处理函数
@@ -47,7 +47,7 @@ func (c *Compiler) NewScope(e env.Environment) *CompilationScope {
 	return scope
 }
 
-func (c *Compiler) Compile(node ast.Node) error {
+func (c *Compiler) Compile(node ast.Node) (any, error) {
 	return c.CallStmtHandler(node)
 }
 
@@ -55,10 +55,10 @@ func (c *Compiler) RegisterStmtHandler(nodeType ast.NodeType, handler compileFun
 	c.handlers[nodeType] = handler
 }
 
-func (c *Compiler) CallStmtHandler(node ast.Node) error {
+func (c *Compiler) CallStmtHandler(node ast.Node) (any, error) {
 	handler, ok := c.handlers[node.NodeType()]
 	if !ok {
-		return nil
+		return nil, fmt.Errorf("no handler for node type : %v", node.NodeType())
 	}
 
 	return handler(node)

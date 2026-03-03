@@ -28,6 +28,8 @@ const (
 	OpGetGlobal
 	OpCall
 	OpReturn
+	OpIndex // 索引
+	OpGetMember
 )
 
 type Instructions []byte // 单个指令

@@ -22,6 +22,8 @@ var definitions = map[Opcode]*Definition{
 	OpGetGlobal: {"OpGetGlobal", []int{2}, OpGetGlobal},
 	OpCall:      {"OpCall", []int{2}, OpCall},
 	OpReturn:    {"OpReturn", nil, OpReturn},
+	OpIndex:     {"OpIndex", nil, OpIndex},
+	OpGetMember: {"OpGetMember", []int{2}, OpGetMember},
 }
 
 func Lookup(op Opcode, constants []any) (*Definition, error) {

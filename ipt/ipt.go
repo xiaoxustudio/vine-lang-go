@@ -1234,7 +1234,12 @@ func (i *Interpreter) EvalSafe() (any, error) {
 
 	// 编译字节码
 	c := compiler.NewCompiler(i.env)
-	e := c.Compile(ast)
+	println("开始编译")
+	_, err := c.Compile(ast)
+	if err != nil {
+		fmt.Printf("编译出错: %v\n", err)
+		return nil, err
+	}
 	// 反射字节码
 	println(c.Dismassemble())
 	println("编译成功，开始vm执行")
@@ -1254,7 +1259,7 @@ func (i *Interpreter) EvalSafe() (any, error) {
 		return types.NewUserModule(i.env.FileName, i.env.Exports), nil
 	}
 
-	return v, e
+	return v, nil
 }
 
 func (i *Interpreter) EvalSafeWithDefer() (any, error) {

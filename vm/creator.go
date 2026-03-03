@@ -7,6 +7,10 @@ import (
 	"vine-lang/bytecode"
 	"vine-lang/compiler"
 	"vine-lang/env"
+	"vine-lang/libs/global"
+	"vine-lang/object/store"
+	"vine-lang/token"
+	"vine-lang/types"
 )
 
 func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
@@ -400,5 +404,71 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		return returnValue, nil
 	})
 
+	v.RegisterOpenCodeHandler(bytecode.OpGetMember, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取属性名索引
+		memberIndex := int(ins[frame.ip+1]) | int(ins[frame.ip+2])<<8
+		if memberIndex >= len(v.constants) {
+			return nil, fmt.Errorf("member index %d out of range", memberIndex)
+		}
+		// 从常量池中获取属性名
+		memberName := v.constants[memberIndex].(string)
+		// 从栈中弹出对象
+		obj := v.pop()
+
+		// 根据对象类型获取属性
+		var value any
+		var err error
+
+		var data types.LibsModule = global.NewModule()
+		data.Get(token.Token{Type: token.IDENT, Value: "test"})
+
+		switch obj := obj.(type) {
+		case *store.StoreObject:
+			// 从存储对象中获取属性
+			if val, ok := obj.Get(token.Token{Type: token.IDENT, Value: memberName}); ok {
+				value = val
+			} else {
+				return nil, fmt.Errorf("member %s not found in object", memberName)
+			}
+		default:
+			if obj, ok := obj.(types.LibsModule); ok {
+				// 从模块中获取属性
+				if val, ok := obj.Get(token.Token{Type: token.IDENT, Value: memberName}); ok {
+					value = val
+				} else {
+					return nil, fmt.Errorf("member %s not found in module", memberName)
+				}
+			} else {
+				// 使用反射获取属性
+				r := reflect.ValueOf(obj)
+				if r.Kind() == reflect.Pointer {
+					r = r.Elem()
+				}
+				if r.Kind() == reflect.Struct {
+					field := r.FieldByName(memberName)
+					if field.IsValid() {
+						value = field.Interface()
+					} else {
+						return nil, fmt.Errorf("member %s not found in struct", memberName)
+					}
+				} else if r.Kind() == reflect.Map {
+					field := r.MapIndex(reflect.ValueOf(memberName))
+					if field.IsValid() {
+						value = field.Interface()
+					} else {
+						return nil, fmt.Errorf("member %s not found in map", memberName)
+					}
+				} else {
+					return nil, fmt.Errorf("cannot get member from type %T", obj)
+				}
+			}
+		}
+
+		// 将获取的值压入栈
+		v.push(value)
+		frame.ip += 3
+		return value, err
+	})
 	return v
 }

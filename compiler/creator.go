@@ -22,42 +22,42 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 	c.NewScope(*e)
 
-	c.RegisterStmtHandler(ast.NodeTypeProgramStmt, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeProgramStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.ProgramStmt)
 		for _, s := range n.Body {
-			err := c.Compile(s)
+			_, err := c.Compile(s)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
-		return nil
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeBlockStmt, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeBlockStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.BlockStmt)
 		for _, s := range n.Body {
-			err := c.Compile(s)
+			_, err := c.Compile(s)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
-		return nil
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeExpressionStmt, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeExpressionStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.ExpressionStmt)
 		return c.Compile(n.Expression)
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeBinaryExpr, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeBinaryExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.BinaryExpr)
-		err := c.Compile(n.Left)
+		_, err := c.Compile(n.Left)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		err = c.Compile(n.Right)
+		_, err = c.Compile(n.Right)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		switch n.Operator.Type {
@@ -70,11 +70,12 @@ func NewCompiler(e *env.Environment) *Compiler {
 		case token.DIV:
 			c.Emit(bytecode.OpDiv)
 		}
-		return nil
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeLiteral, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeLiteral, func(node ast.Node) (any, error) {
 		n := node.(*ast.Literal)
+		var pos int
 		switch n.Value.Type {
 		case token.TRUE:
 			c.Emit(bytecode.OpTrue)
@@ -82,29 +83,31 @@ func NewCompiler(e *env.Environment) *Compiler {
 			c.Emit(bytecode.OpFalse)
 		case token.FLOAT:
 			n, _ := n.Value.GetFloat()
-			pos := c.AddConstant(n)
+			pos = c.AddConstant(n)
 			c.Emit(bytecode.OpConstant, pos)
 		case token.INT:
 			n, _ := n.Value.GetInt()
-			pos := c.AddConstant(n)
+			pos = c.AddConstant(n)
 			c.Emit(bytecode.OpConstant, pos)
 		case token.STRING:
 			v := n.Value.Value
-			pos := c.AddConstant(v)
+			pos = c.AddConstant(v)
 			c.Emit(bytecode.OpConstant, pos)
 		case token.IDENT:
 			// 添加全局变量
-			pos := c.AddConstant(n.Value.Value)
+			pos = c.AddConstant(n.Value.Value)
 			c.Emit(bytecode.OpGetGlobal, pos)
+		default:
+			return nil, fmt.Errorf("unknown literal type: %s", n.Value.Type)
 		}
-		return nil
+		return pos, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeUnaryExpr, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeUnaryExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.UnaryExpr)
-		err := c.Compile(n.Value)
+		_, err := c.Compile(n.Value)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		switch n.Operator.Type {
 		case token.INC:
@@ -112,16 +115,16 @@ func NewCompiler(e *env.Environment) *Compiler {
 		case token.DEC:
 			c.Emit(bytecode.OpDecrement)
 		default:
-			return nil
+			return nil, nil
 		}
-		return nil
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeUseSpecifier, func(node ast.Node) error {
-		return nil
+	c.RegisterStmtHandler(ast.NodeTypeUseSpecifier, func(node ast.Node) (any, error) {
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeUseDecl, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeUseDecl, func(node ast.Node) (any, error) {
 		n := node.(*ast.UseDecl)
 
 		// 获取模块名称
@@ -134,36 +137,28 @@ func NewCompiler(e *env.Environment) *Compiler {
 		// 导入模块到环境中
 		mod, err := env.ImportModule(moduleName)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// 根据不同的导入模式处理
 		switch n.Mode {
 		case token.USE:
 			// 1. use "module" - 导入整个模块
-			if mod_, ok := mod.(types.LibsModule); ok {
-				mod_.ForEach(func(tk token.Token, val any) {
-					env.DefineFast(tk.Value, val)
-				})
-			} else if modObj, ok := mod.(*store.StoreObject); ok {
-				modObj.ForEach(func(tk token.Token, val any) {
-					env.DefineFast(tk.Value, val)
-				})
-			}
+			env.DefineFast(moduleName, mod)
 
 		case token.AS:
 			// 2. use "module" as alias - 导入模块并设置别名
 			if len(n.Specifiers) != 1 {
-				return fmt.Errorf("use as requires exactly one alias")
+				return nil, fmt.Errorf("use as requires exactly one alias")
 			}
 			var alias string
 			if aliasLit, ok := n.Specifiers[0].(*ast.Literal); ok {
 				if aliasLit.Value.Type != token.IDENT {
-					return fmt.Errorf("alias must be an identifier")
+					return nil, fmt.Errorf("alias must be an identifier")
 				}
 				alias = aliasLit.Value.Value
 			} else {
-				return fmt.Errorf("invalid alias specifier")
+				return nil, fmt.Errorf("invalid alias specifier")
 			}
 			env.DefineFast(alias, mod)
 
@@ -175,69 +170,111 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 					if lit, ok := sp.(*ast.Literal); ok {
 						if lit.Value.Type != token.IDENT {
-							return fmt.Errorf("pick target must be an identifier")
+							return nil, fmt.Errorf("pick target must be an identifier")
 						}
 						fnName = lit.Value.Value
 						localName = fnName
 					} else if us, ok := sp.(*ast.UseSpecifier); ok {
 						if us.Remote == nil || us.Remote.Value == nil || us.Remote.Value.Type != token.IDENT {
-							return fmt.Errorf("invalid pick specifier")
+							return nil, fmt.Errorf("invalid pick specifier")
 						}
 						fnName = us.Remote.Value.Value
 						if us.Local != nil && us.Local.Value != nil {
 							if us.Local.Value.Type != token.IDENT {
-								return fmt.Errorf("alias must be an identifier")
+								return nil, fmt.Errorf("alias must be an identifier")
 							}
 							localName = us.Local.Value.Value
 						} else {
 							localName = fnName
 						}
 					} else {
-						return fmt.Errorf("invalid pick specifier")
+						return nil, fmt.Errorf("invalid pick specifier")
 					}
 
 					if fn, ok := mod.Get(token.Token{Type: token.IDENT, Value: fnName}); ok {
 						env.DefineFast(localName, fn)
 					} else {
-						return fmt.Errorf("function %s not found in module %s", fnName, moduleName)
+						return nil, fmt.Errorf("function %s not found in module %s", fnName, moduleName)
 					}
 				}
 			} else {
-				return fmt.Errorf("invalid module type for pick")
+				return nil, fmt.Errorf("invalid module type for pick")
 			}
 
 		default:
-			return fmt.Errorf("unknown use mode: %s", n.Mode)
+			return nil, fmt.Errorf("unknown use mode: %s", n.Mode)
 		}
 
-		return nil
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeArgsExpr, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeArgsExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.ArgsExpr)
 		for _, arg := range n.Arguments {
-			err := c.Compile(arg)
+			_, err := c.Compile(arg)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
-		return nil
+		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeCallExpr, func(node ast.Node) error {
+	c.RegisterStmtHandler(ast.NodeTypeCallExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.CallExpr)
-		err := c.Compile(n.Callee)
+		_, err := c.Compile(n.Callee)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		err = c.Compile(&n.Args)
+		_, err = c.Compile(&n.Args)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		c.Emit(bytecode.OpCall, len(n.Args.Arguments))
-		return nil
+		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeMemberExpr, func(node ast.Node) (any, error) {
+		n := node.(*ast.MemberExpr)
+
+		// 检查Object是否为Literal类型（标识符）
+		if literal, ok := n.Object.(*ast.Literal); ok && literal.Value.Type == token.IDENT {
+			// 直接处理标识符，不进行递归编译
+			identName := literal.Value.Value
+			pos := c.AddConstant(identName)
+			c.Emit(bytecode.OpGetGlobal, pos)
+		} else {
+			// 对于非标识符情况，正常编译
+			_, err := c.Compile(n.Object)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if n.Computed {
+			_, err := c.Compile(n.Property)
+			if err != nil {
+				return nil, err
+			}
+			c.Emit(bytecode.OpIndex)
+		} else {
+			// 处理非计算属性
+			if literal, ok := n.Property.(*ast.Literal); ok && literal.Value.Type == token.IDENT {
+				// 直接处理标识符属性
+				propName := literal.Value.Value
+				pos := c.AddConstant(propName)
+				c.Emit(bytecode.OpGetMember, pos)
+			} else {
+				// 对于非标识符情况，正常编译
+				_, err := c.Compile(n.Property)
+				if err != nil {
+					return nil, err
+				}
+				c.Emit(bytecode.OpGetMember)
+			}
+		}
+		return nil, nil
 	})
 
 	return c
