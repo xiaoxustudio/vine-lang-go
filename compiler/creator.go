@@ -25,6 +25,10 @@ func NewCompiler(e *env.Environment) *Compiler {
 	c.RegisterStmtHandler(ast.NodeTypeProgramStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.ProgramStmt)
 		for _, s := range n.Body {
+			// 跳过注释语句
+			if _, ok := s.(*ast.CommentStmt); ok {
+				continue
+			}
 			_, err := c.Compile(s)
 			if err != nil {
 				return nil, err
@@ -36,6 +40,10 @@ func NewCompiler(e *env.Environment) *Compiler {
 	c.RegisterStmtHandler(ast.NodeTypeBlockStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.BlockStmt)
 		for _, s := range n.Body {
+			// 跳过注释语句
+			if _, ok := s.(*ast.CommentStmt); ok {
+				continue
+			}
 			_, err := c.Compile(s)
 			if err != nil {
 				return nil, err
@@ -373,6 +381,11 @@ func NewCompiler(e *env.Environment) *Compiler {
 				c.Emit(bytecode.OpGetMember)
 			}
 		}
+		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeCommentStmt, func(node ast.Node) (any, error) {
+		// 注释语句在编译时被忽略，不生成任何字节码
 		return nil, nil
 	})
 

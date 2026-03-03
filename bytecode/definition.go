@@ -19,15 +19,17 @@ var definitions = map[Opcode]*Definition{
 	OpDiv:       {"OpDiv", nil, OpDiv},
 	OpJump:      {"OpJump", []int{2}, OpJump},
 	OpSetGlobal: {"OpSetGlobal", []int{2}, OpSetGlobal},
+	OpSetConst:  {"OpSetConst", []int{2}, OpSetConst},
 	OpGetGlobal: {"OpGetGlobal", []int{2}, OpGetGlobal},
 	OpCall:      {"OpCall", []int{2}, OpCall},
 	OpReturn:    {"OpReturn", nil, OpReturn},
 	OpIndex:     {"OpIndex", nil, OpIndex},
+	OpSetIndex:  {"OpSetIndex", nil, OpSetIndex},
 	OpGetMember: {"OpGetMember", []int{2}, OpGetMember},
+	OpSetMember: {"OpSetMember", []int{2}, OpSetMember},
 	OpIncrement: {"OpIncrement", nil, OpIncrement},
 	OpDecrement: {"OpDecrement", nil, OpDecrement},
 	OpArray:     {"OpArray", []int{2}, OpArray},
-	OpSetConst:  {"OpSetConst", []int{2}, OpSetConst},
 }
 
 func Lookup(op Opcode, constants []any) (*Definition, error) {

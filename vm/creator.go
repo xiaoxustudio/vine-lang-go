@@ -292,8 +292,8 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		value := v.pop()
 		// 从常量池中获取变量名
 		varName := v.constants[globalIndex].(string)
-		// 设置到环境中
-		v.env.SetFast(varName, value)
+		// 设置到环境中，使用Set方法来检查常量
+		v.env.Set(token.Token{Type: token.IDENT, Value: varName}, value)
 		frame.ip += 3
 		return value, nil
 	})
