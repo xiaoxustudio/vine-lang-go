@@ -16,9 +16,9 @@ type VM struct {
 	frames     []*Frame // 函数调用栈
 	frameIndex int
 
-	globals  []any // 全局变量
-	locals   []any // 局部变量
-	handlers map[bytecode.Opcode]VMFunc
+	globals  []any            // 全局变量
+	locals   []any            // 局部变量
+	handlers [256]VMFunc      // 使用数组代替map，避免哈希查找开销
 	env      *env.Environment // 环境引用
 }
 
@@ -33,8 +33,8 @@ func (v *VM) RegisterOpenCodeHandler(op bytecode.Opcode, handler VMFunc) {
 }
 
 func (v *VM) CallOpenCodeHandler(op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-	handler, ok := v.handlers[op]
-	if !ok {
+	handler := v.handlers[op]
+	if handler == nil {
 		return nil, errors.New("unknown opcode")
 	}
 
@@ -48,8 +48,12 @@ func (v *VM) Run() (any, error) {
 		if frame.ip >= len(frame.fn.Instructions) {
 			break
 		}
-		opcode := frame.fn.Instructions[frame.ip]
-		r, err := v.RunLine(bytecode.Opcode(opcode), frame.fn.Instructions)
+		opcode := bytecode.Opcode(frame.fn.Instructions[frame.ip])
+		handler := v.handlers[opcode]
+		if handler == nil {
+			return nil, errors.New("unknown opcode")
+		}
+		r, err := handler(v, opcode, frame.fn.Instructions)
 		if err != nil {
 			return nil, err
 		}
@@ -63,6 +67,7 @@ func (v *VM) pushFrame(fn *bytecode.CompiledFunction) {
 	v.frames = append(v.frames, &Frame{fn: fn, ip: 0, basePointer: v.sp})
 }
 
+// currentFrame 获取当前帧，内联优化
 func (v *VM) currentFrame() *Frame {
 	return v.frames[v.frameIndex]
 }

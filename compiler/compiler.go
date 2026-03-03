@@ -24,11 +24,12 @@ type Compiler struct {
 }
 
 type CompilationScope struct {
-	instructions bytecode.Instructions
-	lastIns      EmittedInstruction
-	env          env.Environment
-	symbolTable  map[string]int // 局部变量符号表，记录变量名到索引的映射
-	parent       *CompilationScope // 父作用域
+	instructions    bytecode.Instructions
+	lastIns         EmittedInstruction
+	env             env.Environment
+	symbolTable     map[string]int // 局部变量符号表，记录变量名到索引的映射
+	parent          *CompilationScope // 父作用域
+	constantValues  map[int]any // 局部变量的常量值，用于常量传播优化
 }
 
 type EmittedInstruction struct {

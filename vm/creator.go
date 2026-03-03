@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"vine-lang/bytecode"
 	"vine-lang/compiler"
 	"vine-lang/env"
@@ -42,109 +43,100 @@ func isTruthy(value any) bool {
 
 // compareValues 比较两个值，返回比较结果
 func compareValues(left, right any, operator string) bool {
-	// 处理布尔值
-	if leftBool, ok := left.(bool); ok {
-		if rightBool, ok := right.(bool); ok {
+	// 快速路径：使用类型开关
+	switch left := left.(type) {
+	case int64:
+		switch right := right.(type) {
+		case int64:
 			switch operator {
 			case "==":
-				return leftBool == rightBool
+				return left == right
 			case "!=":
-				return leftBool != rightBool
+				return left != right
+			case "<":
+				return left < right
+			case "<=":
+				return left <= right
+			case ">":
+				return left > right
+			case ">=":
+				return left >= right
+			}
+		case float64:
+			leftFloat := float64(left)
+			switch operator {
+			case "==":
+				return leftFloat == right
+			case "!=":
+				return leftFloat != right
+			case "<":
+				return leftFloat < right
+			case "<=":
+				return leftFloat <= right
+			case ">":
+				return leftFloat > right
+			case ">=":
+				return leftFloat >= right
 			}
 		}
-	}
-
-	// 处理整数
-	if leftInt, ok := left.(int64); ok {
-		if rightInt, ok := right.(int64); ok {
+	case float64:
+		switch right := right.(type) {
+		case int64:
+			rightFloat := float64(right)
 			switch operator {
 			case "==":
-				return leftInt == rightInt
+				return left == rightFloat
 			case "!=":
-				return leftInt != rightInt
+				return left != rightFloat
 			case "<":
-				return leftInt < rightInt
+				return left < rightFloat
 			case "<=":
-				return leftInt <= rightInt
+				return left <= rightFloat
 			case ">":
-				return leftInt > rightInt
+				return left > rightFloat
 			case ">=":
-				return leftInt >= rightInt
+				return left >= rightFloat
+			}
+		case float64:
+			switch operator {
+			case "==":
+				return left == right
+			case "!=":
+				return left != right
+			case "<":
+				return left < right
+			case "<=":
+				return left <= right
+			case ">":
+				return left > right
+			case ">=":
+				return left >= right
 			}
 		}
-		// 处理整数和浮点数的比较
-		if rightFloat, ok := right.(float64); ok {
-			leftFloat := float64(leftInt)
+	case string:
+		if right, ok := right.(string); ok {
 			switch operator {
 			case "==":
-				return leftFloat == rightFloat
+				return left == right
 			case "!=":
-				return leftFloat != rightFloat
+				return left != right
 			case "<":
-				return leftFloat < rightFloat
+				return left < right
 			case "<=":
-				return leftFloat <= rightFloat
+				return left <= right
 			case ">":
-				return leftFloat > rightFloat
+				return left > right
 			case ">=":
-				return leftFloat >= rightFloat
+				return left >= right
 			}
 		}
-	}
-
-	// 处理浮点数
-	if leftFloat, ok := left.(float64); ok {
-		if rightInt, ok := right.(int64); ok {
-			rightFloat := float64(rightInt)
+	case bool:
+		if right, ok := right.(bool); ok {
 			switch operator {
 			case "==":
-				return leftFloat == rightFloat
+				return left == right
 			case "!=":
-				return leftFloat != rightFloat
-			case "<":
-				return leftFloat < rightFloat
-			case "<=":
-				return leftFloat <= rightFloat
-			case ">":
-				return leftFloat > rightFloat
-			case ">=":
-				return leftFloat >= rightFloat
-			}
-		}
-		if rightFloat, ok := right.(float64); ok {
-			switch operator {
-			case "==":
-				return leftFloat == rightFloat
-			case "!=":
-				return leftFloat != rightFloat
-			case "<":
-				return leftFloat < rightFloat
-			case "<=":
-				return leftFloat <= rightFloat
-			case ">":
-				return leftFloat > rightFloat
-			case ">=":
-				return leftFloat >= rightFloat
-			}
-		}
-	}
-
-	// 处理字符串
-	if leftStr, ok := left.(string); ok {
-		if rightStr, ok := right.(string); ok {
-			switch operator {
-			case "==":
-				return leftStr == rightStr
-			case "!=":
-				return leftStr != rightStr
-			case "<":
-				return leftStr < rightStr
-			case "<=":
-				return leftStr <= rightStr
-			case ">":
-				return leftStr > rightStr
-			case ">=":
-				return leftStr >= rightStr
+				return left != right
 			}
 		}
 	}
@@ -169,7 +161,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		frameIndex: 0,
 		globals:    make([]any, 256),
 		locals:     make([]any, 256),
-		handlers:   make(map[bytecode.Opcode]VMFunc),
+		handlers:   [256]VMFunc{},
 		env:        env,
 	}
 
@@ -182,7 +174,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	v.frames[0] = mainFrame
 
 	v.RegisterOpenCodeHandler(bytecode.OpConstant, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) { // 0x01
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取操作数（常量索引，使用Little Endian解码）
 		constIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if constIndex >= len(v.constants) {
@@ -197,14 +189,14 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpFalse, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) { // 0x02
 		v.push(false)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return false, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpTrue, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) { // 0x03
 		v.push(true)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return true, nil
 	})
@@ -216,32 +208,32 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		var result any
 		var err error
 
-		// 处理字符串连接
-		if leftStr, ok := left.(string); ok {
+		switch left := left.(type) {
+		case string:
 			if rightStr, ok := right.(string); ok {
-				result = leftStr + rightStr
+				result = left + rightStr
 			} else {
-				result = fmt.Sprintf("%s%v", leftStr, right)
+				result = fmt.Sprintf("%s%v", left, right)
 			}
-		} else if rightStr, ok := right.(string); ok {
-			result = fmt.Sprintf("%v%s", left, rightStr)
-		} else if leftInt, ok := left.(int64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftInt + rightInt
-			} else if rightFloat, ok := right.(float64); ok {
-				result = float64(leftInt) + rightFloat
-			} else {
+		case int64:
+			switch right := right.(type) {
+			case int64:
+				result = left + right
+			case float64:
+				result = float64(left) + right
+			default:
 				err = errors.New("unsupported types for addition")
 			}
-		} else if leftFloat, ok := left.(float64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftFloat + float64(rightInt)
-			} else if rightFloat, ok := right.(float64); ok {
-				result = leftFloat + rightFloat
-			} else {
+		case float64:
+			switch right := right.(type) {
+			case int64:
+				result = left + float64(right)
+			case float64:
+				result = left + right
+			default:
 				err = errors.New("unsupported types for addition")
 			}
-		} else {
+		default:
 			err = errors.New("unsupported types for addition")
 		}
 
@@ -250,7 +242,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		}
 
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -262,23 +254,26 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		var result any
 		var err error
 
-		if leftInt, ok := left.(int64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftInt - rightInt
-			} else if rightFloat, ok := right.(float64); ok {
-				result = float64(leftInt) - rightFloat
-			} else {
+		switch left := left.(type) {
+		case int64:
+			switch right := right.(type) {
+			case int64:
+				result = left - right
+			case float64:
+				result = float64(left) - right
+			default:
 				err = errors.New("unsupported types for subtraction")
 			}
-		} else if leftFloat, ok := left.(float64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftFloat - float64(rightInt)
-			} else if rightFloat, ok := right.(float64); ok {
-				result = leftFloat - rightFloat
-			} else {
+		case float64:
+			switch right := right.(type) {
+			case int64:
+				result = left - float64(right)
+			case float64:
+				result = left - right
+			default:
 				err = errors.New("unsupported types for subtraction")
 			}
-		} else {
+		default:
 			err = errors.New("unsupported types for subtraction")
 		}
 
@@ -287,7 +282,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		}
 
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -299,23 +294,26 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		var result any
 		var err error
 
-		if leftInt, ok := left.(int64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftInt * rightInt
-			} else if rightFloat, ok := right.(float64); ok {
-				result = float64(leftInt) * rightFloat
-			} else {
+		switch left := left.(type) {
+		case int64:
+			switch right := right.(type) {
+			case int64:
+				result = left * right
+			case float64:
+				result = float64(left) * right
+			default:
 				err = errors.New("unsupported types for multiplication")
 			}
-		} else if leftFloat, ok := left.(float64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftFloat * float64(rightInt)
-			} else if rightFloat, ok := right.(float64); ok {
-				result = leftFloat * rightFloat
-			} else {
+		case float64:
+			switch right := right.(type) {
+			case int64:
+				result = left * float64(right)
+			case float64:
+				result = left * right
+			default:
 				err = errors.New("unsupported types for multiplication")
 			}
-		} else {
+		default:
 			err = errors.New("unsupported types for multiplication")
 		}
 
@@ -324,7 +322,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		}
 
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -337,37 +335,41 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		var err error
 
 		// 检查除数是否为零
-		if rightInt, ok := right.(int64); ok {
-			if rightInt == 0 {
+		switch right := right.(type) {
+		case int64:
+			if right == 0 {
 				return nil, errors.New("division by zero")
 			}
-		} else if rightFloat, ok := right.(float64); ok {
-			if rightFloat == 0 {
+		case float64:
+			if right == 0 {
 				return nil, errors.New("division by zero")
 			}
 		}
 
-		if leftInt, ok := left.(int64); ok {
-			if rightInt, ok := right.(int64); ok {
-				if leftInt%rightInt == 0 {
-					result = leftInt / rightInt
+		switch left := left.(type) {
+		case int64:
+			switch right := right.(type) {
+			case int64:
+				if left%right == 0 {
+					result = left / right
 				} else {
-					result = float64(leftInt) / float64(rightInt)
+					result = float64(left) / float64(right)
 				}
-			} else if rightFloat, ok := right.(float64); ok {
-				result = float64(leftInt) / rightFloat
-			} else {
+			case float64:
+				result = float64(left) / right
+			default:
 				err = errors.New("unsupported types for division")
 			}
-		} else if leftFloat, ok := left.(float64); ok {
-			if rightInt, ok := right.(int64); ok {
-				result = leftFloat / float64(rightInt)
-			} else if rightFloat, ok := right.(float64); ok {
-				result = leftFloat / rightFloat
-			} else {
+		case float64:
+			switch right := right.(type) {
+			case int64:
+				result = left / float64(right)
+			case float64:
+				result = left / right
+			default:
 				err = errors.New("unsupported types for division")
 			}
-		} else {
+		default:
 			err = errors.New("unsupported types for division")
 		}
 
@@ -376,49 +378,51 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		}
 
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpIncrement, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		val := v.pop()
-		if valInt, ok := val.(int64); ok {
+		switch val := val.(type) {
+		case int64:
 			switch op {
 			case bytecode.OpIncrement:
-				v.push(valInt + 1)
+				v.push(val + 1)
 			case bytecode.OpDecrement:
-				v.push(valInt - 1)
+				v.push(val - 1)
 			default:
 				return nil, errors.New("unsupported types for increment/decrement")
 			}
-		} else if valFloat, ok := val.(float64); ok {
+		case float64:
 			switch op {
 			case bytecode.OpIncrement:
-				v.push(valFloat + 1)
+				v.push(val + 1)
 			case bytecode.OpDecrement:
-				v.push(valFloat - 1)
+				v.push(val - 1)
 			default:
 				return nil, errors.New("unsupported types for increment/decrement")
 			}
-		} else {
+		default:
 			return nil, errors.New("unsupported types for increment")
 		}
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return nil, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpDecrement, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		val := v.pop()
-		if valInt, ok := val.(int64); ok {
-			v.push(valInt - 1)
-		} else if valFloat, ok := val.(float64); ok {
-			v.push(valFloat - 1)
-		} else {
+		switch val := val.(type) {
+		case int64:
+			v.push(val - 1)
+		case float64:
+			v.push(val - 1)
+		default:
 			return nil, errors.New("unsupported types for decrement")
 		}
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return nil, nil
 	})
@@ -429,7 +433,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		left := v.pop()
 		result := compareValues(left, right, "==")
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -439,7 +443,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		left := v.pop()
 		result := compareValues(left, right, "!=")
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -449,7 +453,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		left := v.pop()
 		result := compareValues(left, right, "<")
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -459,7 +463,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		left := v.pop()
 		result := compareValues(left, right, "<=")
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -469,7 +473,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		left := v.pop()
 		result := compareValues(left, right, ">")
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
@@ -479,20 +483,20 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		left := v.pop()
 		result := compareValues(left, right, ">=")
 		v.push(result)
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return result, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpPop, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		v.pop()
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		frame.ip += 1
 		return nil, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpJump, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取跳转偏移量
 		offset := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		frame.ip += offset
@@ -500,7 +504,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpJumpIfFalse, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从栈中弹出条件值
 		condition := v.pop()
 		// 从指令中读取跳转偏移量
@@ -515,7 +519,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpJumpIfTrue, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从栈中弹出条件值
 		condition := v.pop()
 		// 从指令中读取跳转偏移量
@@ -530,7 +534,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpLoop, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取跳转偏移量（有符号整数）
 		offset := int16(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 跳转到循环开始位置
@@ -539,7 +543,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpBreak, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 跳出循环，直接跳转到循环结束位置
 		// 这里需要实现循环栈来跟踪循环位置
 		// 暂时简单地跳过循环体
@@ -548,7 +552,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpContinue, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 跳到下一次迭代，跳转到循环开始位置
 		// 这里需要实现循环栈来跟踪循环位置
 		// 暂时简单地跳过循环体
@@ -557,7 +561,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetGlobal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 
 		globalIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if globalIndex >= len(v.constants) {
@@ -585,7 +589,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetConst, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取常量索引
 		constIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if constIndex >= len(v.constants) {
@@ -602,7 +606,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpGetGlobal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 
 		globalIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if globalIndex >= len(v.constants) {
@@ -622,7 +626,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpGetLocal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 
 		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从locals数组中获取局部变量
@@ -637,7 +641,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetLocal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 
 		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中弹出值
@@ -652,13 +656,12 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpCall, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取参数数量
 		argCount := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中弹出函数
 		fn := v.stack[v.sp-1-argCount]
 
-		// 检查函数类型
 		switch fn := fn.(type) {
 		case *bytecode.CompiledFunction:
 			// 创建新的帧
@@ -676,19 +679,15 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 			// 将参数从当前帧复制到新帧的栈中
 			// 栈结构: [..., 函数对象, 参数1, 参数2, ...]
 			// sp指向参数后的位置
-			for i := 0; i < argCount; i++ {
-				argValue := v.stack[v.sp-argCount+i]
-				v.stack[newFrame.basePointer+1+i] = argValue // 参数从函数对象后面开始
-			}
+			base := newFrame.basePointer + 1
+			copy(v.stack[base:base+argCount], v.stack[v.sp-argCount:v.sp])
 			// 调整栈指针，指向参数之后的位置
 			// 这样函数执行时可以从这个位置开始使用栈
-			v.sp = newFrame.basePointer + argCount + 1
+			v.sp = base + argCount
 		case func(...any) (any, error):
 			// 处理Go函数调用
 			args := make([]any, argCount)
-			for i := 0; i < argCount; i++ {
-				args[i] = v.stack[v.sp-argCount+i]
-			}
+			copy(args, v.stack[v.sp-argCount:v.sp])
 			result, err := fn(args...)
 			if err != nil {
 				return nil, err
@@ -728,7 +727,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpReturn, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 获取返回值
 		var returnValue any
 		if v.sp > frame.basePointer {
@@ -753,7 +752,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpGetMember, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取属性名索引
 		memberIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if memberIndex >= len(v.constants) {
@@ -766,9 +765,14 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 		// 根据对象类型获取属性
 		var value any
-		var err error
 
 		switch obj := obj.(type) {
+		case map[string]any:
+			var ok bool
+			value, ok = obj[memberName]
+			if !ok {
+				return nil, fmt.Errorf("member %s not found in map", memberName)
+			}
 		case types.LibsModule:
 			// 从模块中获取属性
 			if val, ok := obj.Get(token.Token{Type: token.IDENT, Value: memberName}); ok {
@@ -811,11 +815,11 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		// 将获取的值压入栈
 		v.push(value)
 		frame.ip += 3
-		return value, err
+		return value, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpIndex, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从栈中弹出索引
 		index := v.pop()
 		// 从栈中弹出数组/对象
@@ -857,7 +861,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetIndex, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从栈中弹出要设置的值
 		value := v.pop()
 		// 从栈中弹出索引
@@ -894,7 +898,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetMember, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取属性名索引
 		memberIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if memberIndex >= len(v.constants) {
@@ -908,12 +912,12 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		obj := v.pop()
 
 		switch obj := obj.(type) {
+		case map[string]any:
+			// 直接设置map的属性，避免反射
+			obj[memberName] = value
 		case *store.StoreObject:
 			// 设置存储对象的属性
 			obj.Define(token.Token{Type: token.IDENT, Value: memberName}, value)
-		case map[string]any:
-			// 设置map的属性
-			obj[memberName] = value
 		default:
 			// 使用反射设置属性
 			r := reflect.ValueOf(obj)
@@ -938,13 +942,13 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpArray, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取数组长度
 		length := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中弹出数组元素
 		array := make([]any, length)
-		for i := 0; i < length; i++ {
-			array[length-i-1] = v.pop()
+		for i := length - 1; i >= 0; i-- {
+			array[i] = v.pop()
 		}
 		// 将数组压入栈
 		v.push(array)
@@ -953,7 +957,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpObject, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
-		frame := v.currentFrame()
+		frame := v.frames[v.frameIndex]
 		// 从指令中读取对象属性数量
 		propCount := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 创建对象map
@@ -964,15 +968,14 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 			value := v.pop()
 			// 弹出键
 			key := v.pop()
-			// 将键转换为字符串
 			var keyStr string
 			switch k := key.(type) {
 			case string:
 				keyStr = k
 			case int64:
-				keyStr = fmt.Sprintf("%d", k)
+				keyStr = strconv.FormatInt(k, 10)
 			case float64:
-				keyStr = fmt.Sprintf("%.0f", k)
+				keyStr = strconv.FormatFloat(k, 'f', -1, 64)
 			default:
 				return nil, fmt.Errorf("object key must be string or number, got %T", key)
 			}

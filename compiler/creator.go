@@ -9,6 +9,7 @@ import (
 	"vine-lang/object/store"
 	"vine-lang/token"
 	"vine-lang/types"
+	"vine-lang/utils"
 )
 
 func NewCompiler(e *env.Environment) *Compiler {
@@ -80,23 +81,54 @@ func NewCompiler(e *env.Environment) *Compiler {
 	c.RegisterStmtHandler(ast.NodeTypeVariableDecl, func(node ast.Node) (any, error) {
 		n := node.(*ast.VariableDecl)
 
-		// 编译变量的值
-		_, err := c.Compile(n.Value)
-		if err != nil {
-			return nil, err
-		}
-
 		varName := n.Name.Value.Value
 
 		// 检查是否为局部变量
 		currentScope := c.scopes[c.scopeIndex]
 		if localIndex, ok := currentScope.symbolTable[varName]; ok {
 			// 局部变量已存在，直接使用
+			_, err := c.Compile(n.Value)
+			if err != nil {
+				return nil, err
+			}
 			c.Emit(bytecode.OpSetLocal, localIndex)
 		} else {
-			// 定义为新的局部变量
-			localIndex = c.DefineLocal(varName)
-			c.Emit(bytecode.OpSetLocal, localIndex)
+			// 检查是否为常量表达式
+			if lit, ok := n.Value.(*ast.Literal); ok && (lit.Value.Type == token.INT || lit.Value.Type == token.FLOAT) {
+				// 定义为新的局部变量
+				localIndex = c.DefineLocal(varName)
+				// 直接发出常量，不进行编译
+				var pos int
+				if lit.Value.Type == token.INT {
+					val, _ := lit.Value.GetInt()
+					pos = c.AddConstant(val)
+				} else {
+					val, _ := lit.Value.GetFloat()
+					pos = c.AddConstant(val)
+				}
+				c.Emit(bytecode.OpConstant, pos)
+				c.Emit(bytecode.OpSetLocal, localIndex)
+				// 记录变量的常量值
+				if currentScope.constantValues == nil {
+					currentScope.constantValues = make(map[int]any)
+				}
+				if lit.Value.Type == token.INT {
+					val, _ := lit.Value.GetInt()
+					currentScope.constantValues[localIndex] = val
+				} else {
+					val, _ := lit.Value.GetFloat()
+					currentScope.constantValues[localIndex] = val
+				}
+			} else {
+				// 定义为新的局部变量
+				localIndex = c.DefineLocal(varName)
+				// 编译变量的值
+				_, err := c.Compile(n.Value)
+				if err != nil {
+					return nil, err
+				}
+				c.Emit(bytecode.OpSetLocal, localIndex)
+			}
 		}
 
 		return nil, nil
@@ -820,6 +852,67 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 	c.RegisterStmtHandler(ast.NodeTypeBinaryExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.BinaryExpr)
+
+		// 尝试常量折叠优化
+		leftLit, leftIsLit := n.Left.(*ast.Literal)
+		rightLit, rightIsLit := n.Right.(*ast.Literal)
+
+		// 如果左右都是数字字面量，进行常量折叠
+		if leftIsLit && rightIsLit {
+			// 使用utils中的BinaryVal函数进行常量折叠
+			result, err := utils.BinaryVal(&leftLit.Value, n.Operator.Type, &rightLit.Value)
+			if err == nil {
+				// 将计算结果作为常量发出
+				pos := c.AddConstant(result)
+				c.Emit(bytecode.OpConstant, pos)
+				return nil, nil
+			}
+		}
+
+		// 尝试常量传播优化
+		// 如果左操作数是常量变量，直接使用常量值
+		if leftLit, ok := n.Left.(*ast.Literal); ok && leftLit.Value.Type == token.IDENT {
+			currentScope := c.scopes[c.scopeIndex]
+			isLocal, localIndex := c.ResolveVariable(leftLit.Value.Value)
+			if isLocal {
+				if constantValues, ok := currentScope.constantValues[localIndex]; ok {
+					// 变量是常量，直接使用常量值
+					if rightLit, ok := n.Right.(*ast.Literal); ok {
+						// 使用utils中的BinaryVal函数进行常量折叠
+						result, err := utils.BinaryVal(constantValues, n.Operator.Type, &rightLit.Value)
+						if err == nil {
+							// 将计算结果作为常量发出
+							pos := c.AddConstant(result)
+							c.Emit(bytecode.OpConstant, pos)
+							return nil, nil
+						}
+					}
+				}
+			}
+		}
+
+		// 如果右操作数是常量变量，直接使用常量值
+		if rightLit, ok := n.Right.(*ast.Literal); ok && rightLit.Value.Type == token.IDENT {
+			currentScope := c.scopes[c.scopeIndex]
+			isLocal, localIndex := c.ResolveVariable(rightLit.Value.Value)
+			if isLocal {
+				if constantValues, ok := currentScope.constantValues[localIndex]; ok {
+					// 变量是常量，直接使用常量值
+					if leftLit, ok := n.Left.(*ast.Literal); ok {
+						// 使用utils中的BinaryVal函数进行常量折叠
+						result, err := utils.BinaryVal(&leftLit.Value, n.Operator.Type, constantValues)
+						if err == nil {
+							// 将计算结果作为常量发出
+							pos := c.AddConstant(result)
+							c.Emit(bytecode.OpConstant, pos)
+							return nil, nil
+						}
+					}
+				}
+			}
+		}
+
+		// 正常编译流程
 		_, err := c.Compile(n.Left)
 		if err != nil {
 			return nil, err
