@@ -19,6 +19,8 @@ const (
 	OpDiv
 	OpPop // 弹出栈顶元素
 	OpJump
+	OpJumpIfFalse // 条件为假时跳转
+	OpJumpIfTrue  // 条件为真时跳转
 
 	OpIncrement // 自增
 	OpDecrement // 自减

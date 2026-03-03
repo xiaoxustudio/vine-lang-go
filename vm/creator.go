@@ -13,6 +13,33 @@ import (
 	"vine-lang/types"
 )
 
+// isTruthy 判断值是否为真
+func isTruthy(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	case int64:
+		return v != 0
+	case float64:
+		return v != 0
+	case string:
+		return v != ""
+	case nil:
+		return false
+	default:
+		// 对于其他类型，使用反射判断
+		rv := reflect.ValueOf(value)
+		switch rv.Kind() {
+		case reflect.Array, reflect.Slice, reflect.Map:
+			return rv.Len() > 0
+		case reflect.Ptr:
+			return !rv.IsNil()
+		default:
+			return true
+		}
+	}
+}
+
 // compareValues 比较两个值，返回比较结果
 func compareValues(left, right any, operator string) bool {
 	// 处理布尔值
@@ -468,6 +495,36 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		// 从指令中读取跳转偏移量
 		offset := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		frame.ip += offset
+		return nil, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpJumpIfFalse, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从栈中弹出条件值
+		condition := v.pop()
+		// 从指令中读取跳转偏移量
+		offset := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		// 如果条件为假，跳转
+		if !isTruthy(condition) {
+			frame.ip += offset
+		} else {
+			frame.ip += 3
+		}
+		return nil, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpJumpIfTrue, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从栈中弹出条件值
+		condition := v.pop()
+		// 从指令中读取跳转偏移量
+		offset := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		// 如果条件为真，跳转
+		if isTruthy(condition) {
+			frame.ip += offset
+		} else {
+			frame.ip += 3
+		}
 		return nil, nil
 	})
 
