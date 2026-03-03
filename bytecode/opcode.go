@@ -23,6 +23,14 @@ const (
 	OpIncrement // 自增
 	OpDecrement // 自减
 
+	/* 比较 */
+	OpEqual
+	OpNotEqual
+	OpLessThan
+	OpLessEqual
+	OpGreaterThan
+	OpGreaterEqual
+
 	/* 操作 */
 	OpSetGlobal
 	OpSetConst // 设置常量

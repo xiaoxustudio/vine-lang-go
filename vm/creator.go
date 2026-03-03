@@ -13,6 +13,126 @@ import (
 	"vine-lang/types"
 )
 
+// compareValues 比较两个值，返回比较结果
+func compareValues(left, right any, operator string) bool {
+	// 处理布尔值
+	if leftBool, ok := left.(bool); ok {
+		if rightBool, ok := right.(bool); ok {
+			switch operator {
+			case "==":
+				return leftBool == rightBool
+			case "!=":
+				return leftBool != rightBool
+			}
+		}
+	}
+
+	// 处理整数
+	if leftInt, ok := left.(int64); ok {
+		if rightInt, ok := right.(int64); ok {
+			switch operator {
+			case "==":
+				return leftInt == rightInt
+			case "!=":
+				return leftInt != rightInt
+			case "<":
+				return leftInt < rightInt
+			case "<=":
+				return leftInt <= rightInt
+			case ">":
+				return leftInt > rightInt
+			case ">=":
+				return leftInt >= rightInt
+			}
+		}
+		// 处理整数和浮点数的比较
+		if rightFloat, ok := right.(float64); ok {
+			leftFloat := float64(leftInt)
+			switch operator {
+			case "==":
+				return leftFloat == rightFloat
+			case "!=":
+				return leftFloat != rightFloat
+			case "<":
+				return leftFloat < rightFloat
+			case "<=":
+				return leftFloat <= rightFloat
+			case ">":
+				return leftFloat > rightFloat
+			case ">=":
+				return leftFloat >= rightFloat
+			}
+		}
+	}
+
+	// 处理浮点数
+	if leftFloat, ok := left.(float64); ok {
+		if rightInt, ok := right.(int64); ok {
+			rightFloat := float64(rightInt)
+			switch operator {
+			case "==":
+				return leftFloat == rightFloat
+			case "!=":
+				return leftFloat != rightFloat
+			case "<":
+				return leftFloat < rightFloat
+			case "<=":
+				return leftFloat <= rightFloat
+			case ">":
+				return leftFloat > rightFloat
+			case ">=":
+				return leftFloat >= rightFloat
+			}
+		}
+		if rightFloat, ok := right.(float64); ok {
+			switch operator {
+			case "==":
+				return leftFloat == rightFloat
+			case "!=":
+				return leftFloat != rightFloat
+			case "<":
+				return leftFloat < rightFloat
+			case "<=":
+				return leftFloat <= rightFloat
+			case ">":
+				return leftFloat > rightFloat
+			case ">=":
+				return leftFloat >= rightFloat
+			}
+		}
+	}
+
+	// 处理字符串
+	if leftStr, ok := left.(string); ok {
+		if rightStr, ok := right.(string); ok {
+			switch operator {
+			case "==":
+				return leftStr == rightStr
+			case "!=":
+				return leftStr != rightStr
+			case "<":
+				return leftStr < rightStr
+			case "<=":
+				return leftStr <= rightStr
+			case ">":
+				return leftStr > rightStr
+			case ">=":
+				return leftStr >= rightStr
+			}
+		}
+	}
+
+	// 使用 reflect 进行通用比较
+	switch operator {
+	case "==":
+		return reflect.DeepEqual(left, right)
+	case "!=":
+		return !reflect.DeepEqual(left, right)
+	default:
+		return false
+	}
+}
+
 func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	v := &VM{
 		constants:  c.GetConstantRaw(),
@@ -273,6 +393,67 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		frame := v.currentFrame()
 		frame.ip += 1
 		return nil, nil
+	})
+
+	// 比较操作处理器
+	v.RegisterOpenCodeHandler(bytecode.OpEqual, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		right := v.pop()
+		left := v.pop()
+		result := compareValues(left, right, "==")
+		v.push(result)
+		frame := v.currentFrame()
+		frame.ip += 1
+		return result, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpNotEqual, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		right := v.pop()
+		left := v.pop()
+		result := compareValues(left, right, "!=")
+		v.push(result)
+		frame := v.currentFrame()
+		frame.ip += 1
+		return result, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpLessThan, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		right := v.pop()
+		left := v.pop()
+		result := compareValues(left, right, "<")
+		v.push(result)
+		frame := v.currentFrame()
+		frame.ip += 1
+		return result, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpLessEqual, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		right := v.pop()
+		left := v.pop()
+		result := compareValues(left, right, "<=")
+		v.push(result)
+		frame := v.currentFrame()
+		frame.ip += 1
+		return result, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpGreaterThan, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		right := v.pop()
+		left := v.pop()
+		result := compareValues(left, right, ">")
+		v.push(result)
+		frame := v.currentFrame()
+		frame.ip += 1
+		return result, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpGreaterEqual, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		right := v.pop()
+		left := v.pop()
+		result := compareValues(left, right, ">=")
+		v.push(result)
+		frame := v.currentFrame()
+		frame.ip += 1
+		return result, nil
 	})
 
 	v.RegisterOpenCodeHandler(bytecode.OpPop, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
