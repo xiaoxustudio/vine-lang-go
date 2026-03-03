@@ -434,16 +434,23 @@ func (p *Parser) parseMemberExpression() ast.Expr {
 		return nil
 	}
 	left := p.parseSuffixExpression()
-	if p.peek().Type == token.DOT {
-		p.advance()
-		right := p.parseMemberExpression()
-		return ast.NewMemberExpr(left, right, false)
-	} else if p.peek().Type == token.LBRACKET {
-		p.advance()
-		right := p.parseMemberExpression()
-		p.expect(token.RBRACKET)
-		return ast.NewMemberExpr(left, right, true)
+
+	// 处理链式成员访问（如 b.d[0]）
+	for {
+		if p.peek().Type == token.DOT {
+			p.advance()
+			property := p.parseSuffixExpression()
+			left = ast.NewMemberExpr(left, property, false)
+		} else if p.peek().Type == token.LBRACKET {
+			p.advance()
+			property := p.parseExpression()
+			p.expect(token.RBRACKET)
+			left = ast.NewMemberExpr(left, property, true)
+		} else {
+			break
+		}
 	}
+
 	return left
 }
 
