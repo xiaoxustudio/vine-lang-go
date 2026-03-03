@@ -116,9 +116,6 @@ func NewCompiler(e *env.Environment) *Compiler {
 			}
 		}
 
-		// 编译函数体
-		// 注意：函数体可能是一个块语句，会创建新的作用域
-		// 我们需要捕获这些作用域的指令
 		var allInstructions []byte
 
 		// 保存编译前的 scopeIndex
@@ -132,13 +129,6 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 		// 检查是否有新的作用域被创建
 		if c.scopeIndex > beforeCompileScopeIndex {
-			// 有新的作用域被创建，我们需要捕获这些作用域的指令
-			// 注意：这些作用域已经被 LeaveScope 移除了，所以我们无法直接访问
-			// 我们需要修改 LeaveScope 的行为，或者在这里手动处理
-
-			// 由于作用域已经被移除，我们需要从编译结果中获取指令
-			// 但编译结果没有返回指令，所以我们需要另一种方法
-			// 让我们看看编译函数体后，当前作用域的指令
 			currentScope := c.CurrentScope()
 			if len(currentScope.instructions) > 0 {
 				allInstructions = append(allInstructions, currentScope.instructions...)
@@ -174,6 +164,69 @@ func NewCompiler(e *env.Environment) *Compiler {
 			// 匿名函数，直接压入栈
 			c.Emit(bytecode.OpConstant, pos)
 		}
+
+		return fn, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeLambdaFunctionDecl, func(node ast.Node) (any, error) {
+		n := node.(*ast.LambdaFunctionDecl)
+
+		// 进入新的编译作用域用于函数体
+		// 使用当前作用域的环境
+		currentEnv := c.scopes[c.scopeIndex].env
+		c.EnterScope(currentEnv)
+
+		// 获取函数作用域
+		funcScope := c.CurrentScope()
+
+		// 处理函数参数，将参数名添加到符号表
+		for _, arg := range n.Args.Arguments {
+			if lit, ok := arg.(*ast.Literal); ok && lit.Value.Type == token.IDENT {
+				paramName := lit.Value.Value
+				c.DefineLocal(paramName)
+			}
+		}
+
+		var allInstructions []byte
+
+		// 保存编译前的 scopeIndex
+		beforeCompileScopeIndex := c.scopeIndex
+
+		// 编译函数体
+		_, err := c.Compile(&n.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// 检查是否有新的作用域被创建
+		if c.scopeIndex > beforeCompileScopeIndex {
+			currentScope := c.CurrentScope()
+			if len(currentScope.instructions) > 0 {
+				allInstructions = append(allInstructions, currentScope.instructions...)
+			}
+		} else {
+			// 没有新的作用域被创建，直接使用当前作用域的指令
+			currentScope := c.CurrentScope()
+			allInstructions = currentScope.instructions
+		}
+
+		// 退出所有嵌套的作用域，直到回到函数声明之前的作用域
+		for c.scopeIndex >= 0 && c.scopes[c.scopeIndex] != funcScope.parent {
+			c.LeaveScope()
+		}
+
+		// 创建函数对象
+		fn := &bytecode.CompiledFunction{
+			Instructions:  allInstructions,
+			NumLocals:     len(funcScope.symbolTable),
+			NumParameters: len(n.Args.Arguments),
+		}
+
+		// 将函数对象添加到常量池
+		pos := c.AddConstant(fn)
+
+		// 匿名函数，直接压入栈
+		c.Emit(bytecode.OpConstant, pos)
 
 		return fn, nil
 	})
