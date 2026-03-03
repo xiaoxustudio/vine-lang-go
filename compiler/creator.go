@@ -277,18 +277,26 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return nil, nil
 	})
 
-	// c.RegisterStmtHandler(ast.NodeTypeVariableDecl, func(node ast.Node) (any, error) {
-	// 	n := node.(*ast.VariableDecl)
-	// 	if n.IsConst {
-	// 		c.Emit(bytecode.OpConst)
-	// 	}
-	// 	_, err = c.Compile(n.Value)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	c.Emit(bytecode.OpSetGlobal)
-	// 	return nil, nil
-	// })
+	c.RegisterStmtHandler(ast.NodeTypeVariableDecl, func(node ast.Node) (any, error) {
+		n := node.(*ast.VariableDecl)
+
+		// 编译变量的值
+		_, err := c.Compile(n.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		varName := n.Name.Value.Value
+		pos := c.AddConstant(varName)
+
+		if n.IsConst {
+			c.Emit(bytecode.OpSetConst, pos)
+		} else {
+			c.Emit(bytecode.OpSetGlobal, pos)
+		}
+
+		return nil, nil
+	})
 
 	c.RegisterStmtHandler(ast.NodeTypeProperty, func(node ast.Node) (any, error) {
 		n := node.(*ast.Property)

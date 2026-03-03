@@ -298,6 +298,23 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		return value, nil
 	})
 
+	v.RegisterOpenCodeHandler(bytecode.OpSetConst, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取常量索引（使用Little Endian解码）
+		constIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		if constIndex >= len(v.constants) {
+			return nil, fmt.Errorf("constant index %d out of range", constIndex)
+		}
+		// 从栈中弹出值
+		value := v.pop()
+		// 从常量池中获取变量名
+		constName := v.constants[constIndex].(string)
+		// 定义常量到环境中
+		v.env.DefineConst(token.Token{Type: token.IDENT, Value: constName}, value)
+		frame.ip += 3
+		return value, nil
+	})
+
 	v.RegisterOpenCodeHandler(bytecode.OpGetGlobal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
 		// 从指令中读取全局变量索引（使用Little Endian解码）

@@ -25,6 +25,7 @@ const (
 
 	/* 操作 */
 	OpSetGlobal
+	OpSetConst // 设置常量
 	OpGetGlobal
 	OpCall
 	OpReturn
@@ -33,7 +34,6 @@ const (
 
 	/* 结构 */
 	OpArray
-	OpConst
 )
 
 type Instructions []byte // 单个指令

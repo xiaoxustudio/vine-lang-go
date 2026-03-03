@@ -1,3 +1,5 @@
 use glb pick print
 
-print([1 ,"123",3])
+cst a = [1 ,"123",3]
+
+print(a)

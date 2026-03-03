@@ -257,7 +257,7 @@ type VariableDecl struct {
 	BaseNode
 	Name    Literal
 	Value   Expr
-	IsConst bool
+	IsConst bool // 是否是常量
 }
 
 func NewVariableDecl(name Literal, value Expr, isConst bool) *VariableDecl {
