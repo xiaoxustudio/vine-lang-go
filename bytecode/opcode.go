@@ -27,6 +27,8 @@ const (
 	OpSetGlobal
 	OpSetConst // 设置常量
 	OpGetGlobal
+	OpGetLocal // 获取局部变量
+	OpSetLocal // 设置局部变量
 	OpCall
 	OpReturn
 	OpIndex // 索引

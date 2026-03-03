@@ -37,6 +37,11 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return nil, nil
 	})
 
+	c.RegisterStmtHandler(ast.NodeTypeCommentStmt, func(node ast.Node) (any, error) {
+		// 注释语句在编译时被忽略，不生成任何字节码
+		return nil, nil
+	})
+
 	c.RegisterStmtHandler(ast.NodeTypeBlockStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.BlockStmt)
 		for _, s := range n.Body {
@@ -50,65 +55,6 @@ func NewCompiler(e *env.Environment) *Compiler {
 			}
 		}
 		return nil, nil
-	})
-
-	c.RegisterStmtHandler(ast.NodeTypeExpressionStmt, func(node ast.Node) (any, error) {
-		n := node.(*ast.ExpressionStmt)
-		return c.Compile(n.Expression)
-	})
-
-	c.RegisterStmtHandler(ast.NodeTypeBinaryExpr, func(node ast.Node) (any, error) {
-		n := node.(*ast.BinaryExpr)
-		_, err := c.Compile(n.Left)
-		if err != nil {
-			return nil, err
-		}
-		_, err = c.Compile(n.Right)
-		if err != nil {
-			return nil, err
-		}
-
-		switch n.Operator.Type {
-		case token.PLUS:
-			c.Emit(bytecode.OpPlus)
-		case token.MINUS:
-			c.Emit(bytecode.OpMinus)
-		case token.MUL:
-			c.Emit(bytecode.OpMul)
-		case token.DIV:
-			c.Emit(bytecode.OpDiv)
-		}
-		return nil, nil
-	})
-
-	c.RegisterStmtHandler(ast.NodeTypeLiteral, func(node ast.Node) (any, error) {
-		n := node.(*ast.Literal)
-		var pos int
-		switch n.Value.Type {
-		case token.TRUE:
-			c.Emit(bytecode.OpTrue)
-		case token.FALSE:
-			c.Emit(bytecode.OpFalse)
-		case token.FLOAT:
-			n, _ := n.Value.GetFloat()
-			pos = c.AddConstant(n)
-			c.Emit(bytecode.OpConstant, pos)
-		case token.INT:
-			n, _ := n.Value.GetInt()
-			pos = c.AddConstant(n)
-			c.Emit(bytecode.OpConstant, pos)
-		case token.STRING:
-			v := n.Value.Value
-			pos = c.AddConstant(v)
-			c.Emit(bytecode.OpConstant, pos)
-		case token.IDENT:
-			// 添加全局变量
-			pos = c.AddConstant(n.Value.Value)
-			c.Emit(bytecode.OpGetGlobal, pos)
-		default:
-			return nil, fmt.Errorf("unknown literal type: %s", n.Value.Type)
-		}
-		return pos, nil
 	})
 
 	c.RegisterStmtHandler(ast.NodeTypeVariableDecl, func(node ast.Node) (any, error) {
@@ -132,98 +78,71 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeAssignmentExpr, func(node ast.Node) (any, error) {
-		n := node.(*ast.AssignmentExpr)
+	c.RegisterStmtHandler(ast.NodeTypeFunctionDecl, func(node ast.Node) (any, error) {
+		n := node.(*ast.FunctionDecl)
 
-		// 复合赋值操作符需要先获取变量的当前值
-		switch n.Operator.Type {
-		case token.INC_EQ, token.DEC_EQ, token.MUL_EQ, token.DIV_EQ:
-			// 先编译左边，获取变量的当前值
-			_, err := c.Compile(n.Left)
-			if err != nil {
-				return nil, err
+		// 保存当前作用域
+		currentScopeIndex := c.scopeIndex
+
+		// 创建新的编译作用域用于函数体
+		c.NewScope(c.scopes[currentScopeIndex].env)
+
+		// 获取函数作用域
+		funcScope := c.scopes[c.scopeIndex]
+
+		// 处理函数参数，将参数名添加到符号表
+		for i, arg := range n.Arguments.Arguments {
+			if lit, ok := arg.(*ast.Literal); ok && lit.Value.Type == token.IDENT {
+				paramName := lit.Value.Value
+				funcScope.symbolTable[paramName] = i
 			}
 		}
 
-		// 编译右边的表达式
-		_, err := c.Compile(n.Right)
+		// 编译函数体
+		_, err := c.Compile(n.Body)
 		if err != nil {
 			return nil, err
 		}
 
-		// 根据操作符类型生成相应的指令
-		switch n.Operator.Type {
-		case token.ASSIGN:
-			// 简单赋值，不需要额外操作
-		case token.INC_EQ:
-			// += 操作
-			c.Emit(bytecode.OpPlus)
-		case token.DEC_EQ:
-			// -= 操作
-			c.Emit(bytecode.OpMinus)
-		case token.MUL_EQ:
-			// *= 操作
-			c.Emit(bytecode.OpMul)
-		case token.DIV_EQ:
-			// /= 操作
-			c.Emit(bytecode.OpDiv)
-		default:
-			return nil, fmt.Errorf("unknown assignment operator: %s", n.Operator.Type)
+		// 获取函数体的指令
+		instructions := funcScope.instructions
+
+		// 恢复到父作用域
+		c.scopeIndex = currentScopeIndex
+
+		// 创建函数对象
+		fn := &bytecode.CompiledFunction{
+			Instructions:  instructions,
+			NumLocals:     len(funcScope.symbolTable),
+			NumParameters: len(n.Arguments.Arguments),
 		}
 
-		// 处理左边的赋值目标
-		switch left := n.Left.(type) {
-		case *ast.Literal:
-			if left.Value.Type == token.IDENT {
-				// 标识符赋值
-				varName := left.Value.Value
-				pos := c.AddConstant(varName)
-				c.Emit(bytecode.OpSetGlobal, pos)
-			}
-		case *ast.MemberExpr:
-			// 成员赋值
-			_, err := c.Compile(left.Object)
-			if err != nil {
-				return nil, err
-			}
-			if left.Computed {
-				// 计算属性赋值 obj[key] = value
-				_, err := c.Compile(left.Property)
-				if err != nil {
-					return nil, err
-				}
-				// 使用OpSetIndex指令设置索引
-				c.Emit(bytecode.OpSetIndex)
-			} else {
-				// 非计算属性赋值 obj.prop = value
-				if literal, ok := left.Property.(*ast.Literal); ok && literal.Value.Type == token.IDENT {
-					propName := literal.Value.Value
-					pos := c.AddConstant(propName)
-					// 使用OpSetMember指令设置成员
-					c.Emit(bytecode.OpSetMember, pos)
-				}
-			}
-		default:
-			return nil, fmt.Errorf("invalid assignment target")
+		// 将函数对象添加到常量池
+		pos := c.AddConstant(fn)
+
+		// 如果函数有名称，则将其定义为全局变量
+		if n.ID != nil && n.ID.Value.Type == token.IDENT {
+			funcName := n.ID.Value.Value
+			namePos := c.AddConstant(funcName)
+			c.Emit(bytecode.OpConstant, pos)
+			c.Emit(bytecode.OpSetGlobal, namePos)
+		} else {
+			// 匿名函数，直接压入栈
+			c.Emit(bytecode.OpConstant, pos)
 		}
 
-		return nil, nil
+		return fn, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeUnaryExpr, func(node ast.Node) (any, error) {
-		n := node.(*ast.UnaryExpr)
-		_, err := c.Compile(n.Value)
-		if err != nil {
-			return nil, err
+	c.RegisterStmtHandler(ast.NodeTypeReturnStmt, func(node ast.Node) (any, error) {
+		n := node.(*ast.ReturnStmt)
+		if n.Value != nil {
+			_, err := c.Compile(n.Value)
+			if err != nil {
+				return nil, err
+			}
 		}
-		switch n.Operator.Type {
-		case token.INC:
-			c.Emit(bytecode.OpIncrement)
-		case token.DEC:
-			c.Emit(bytecode.OpDecrement)
-		default:
-			return nil, nil
-		}
+		c.Emit(bytecode.OpReturn)
 		return nil, nil
 	})
 
@@ -315,6 +234,114 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return nil, nil
 	})
 
+	c.RegisterStmtHandler(ast.NodeTypeExpressionStmt, func(node ast.Node) (any, error) {
+		n := node.(*ast.ExpressionStmt)
+		return c.Compile(n.Expression)
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeAssignmentExpr, func(node ast.Node) (any, error) {
+		n := node.(*ast.AssignmentExpr)
+
+		// 复合赋值操作符需要先获取变量的当前值
+		switch n.Operator.Type {
+		case token.INC_EQ, token.DEC_EQ, token.MUL_EQ, token.DIV_EQ:
+			// 先编译左边，获取变量的当前值
+			_, err := c.Compile(n.Left)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// 编译右边的表达式
+		_, err := c.Compile(n.Right)
+		if err != nil {
+			return nil, err
+		}
+
+		// 根据操作符类型生成相应的指令
+		switch n.Operator.Type {
+		case token.ASSIGN:
+			// 简单赋值，不需要额外操作
+		case token.INC_EQ:
+			// += 操作
+			c.Emit(bytecode.OpPlus)
+		case token.DEC_EQ:
+			// -= 操作
+			c.Emit(bytecode.OpMinus)
+		case token.MUL_EQ:
+			// *= 操作
+			c.Emit(bytecode.OpMul)
+		case token.DIV_EQ:
+			// /= 操作
+			c.Emit(bytecode.OpDiv)
+		default:
+			return nil, fmt.Errorf("unknown assignment operator: %s", n.Operator.Type)
+		}
+
+		// 处理左边的赋值目标
+		switch left := n.Left.(type) {
+		case *ast.Literal:
+			if left.Value.Type == token.IDENT {
+				// 标识符赋值
+				varName := left.Value.Value
+				// 检查是否为局部变量
+				currentScope := c.scopes[c.scopeIndex]
+				if localIndex, ok := currentScope.symbolTable[varName]; ok {
+					// 局部变量
+					c.Emit(bytecode.OpSetLocal, localIndex)
+				} else {
+					// 全局变量
+					pos := c.AddConstant(varName)
+					c.Emit(bytecode.OpSetGlobal, pos)
+				}
+			}
+		case *ast.MemberExpr:
+			// 成员赋值
+			_, err := c.Compile(left.Object)
+			if err != nil {
+				return nil, err
+			}
+			if left.Computed {
+				// 计算属性赋值 obj[key] = value
+				_, err := c.Compile(left.Property)
+				if err != nil {
+					return nil, err
+				}
+				// 使用OpSetIndex指令设置索引
+				c.Emit(bytecode.OpSetIndex)
+			} else {
+				// 非计算属性赋值 obj.prop = value
+				if literal, ok := left.Property.(*ast.Literal); ok && literal.Value.Type == token.IDENT {
+					propName := literal.Value.Value
+					pos := c.AddConstant(propName)
+					// 使用OpSetMember指令设置成员
+					c.Emit(bytecode.OpSetMember, pos)
+				}
+			}
+		default:
+			return nil, fmt.Errorf("invalid assignment target")
+		}
+
+		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeUnaryExpr, func(node ast.Node) (any, error) {
+		n := node.(*ast.UnaryExpr)
+		_, err := c.Compile(n.Value)
+		if err != nil {
+			return nil, err
+		}
+		switch n.Operator.Type {
+		case token.INC:
+			c.Emit(bytecode.OpIncrement)
+		case token.DEC:
+			c.Emit(bytecode.OpDecrement)
+		default:
+			return nil, nil
+		}
+		return nil, nil
+	})
+
 	c.RegisterStmtHandler(ast.NodeTypeArgsExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.ArgsExpr)
 		for _, arg := range n.Arguments {
@@ -384,11 +411,6 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return nil, nil
 	})
 
-	c.RegisterStmtHandler(ast.NodeTypeCommentStmt, func(node ast.Node) (any, error) {
-		// 注释语句在编译时被忽略，不生成任何字节码
-		return nil, nil
-	})
-
 	c.RegisterStmtHandler(ast.NodeTypeProperty, func(node ast.Node) (any, error) {
 		n := node.(*ast.Property)
 		// 对于数组元素，只需要编译 Value，不需要编译 Key（索引）
@@ -409,6 +431,67 @@ func NewCompiler(e *env.Environment) *Compiler {
 		}
 		c.Emit(bytecode.OpArray, len(n.Items))
 		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeBinaryExpr, func(node ast.Node) (any, error) {
+		n := node.(*ast.BinaryExpr)
+		_, err := c.Compile(n.Left)
+		if err != nil {
+			return nil, err
+		}
+		_, err = c.Compile(n.Right)
+		if err != nil {
+			return nil, err
+		}
+
+		switch n.Operator.Type {
+		case token.PLUS:
+			c.Emit(bytecode.OpPlus)
+		case token.MINUS:
+			c.Emit(bytecode.OpMinus)
+		case token.MUL:
+			c.Emit(bytecode.OpMul)
+		case token.DIV:
+			c.Emit(bytecode.OpDiv)
+		}
+		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeLiteral, func(node ast.Node) (any, error) {
+		n := node.(*ast.Literal)
+		var pos int
+		switch n.Value.Type {
+		case token.TRUE:
+			c.Emit(bytecode.OpTrue)
+		case token.FALSE:
+			c.Emit(bytecode.OpFalse)
+		case token.FLOAT:
+			n, _ := n.Value.GetFloat()
+			pos = c.AddConstant(n)
+			c.Emit(bytecode.OpConstant, pos)
+		case token.INT:
+			n, _ := n.Value.GetInt()
+			pos = c.AddConstant(n)
+			c.Emit(bytecode.OpConstant, pos)
+		case token.STRING:
+			v := n.Value.Value
+			pos = c.AddConstant(v)
+			c.Emit(bytecode.OpConstant, pos)
+		case token.IDENT:
+			// 检查是否为局部变量
+			currentScope := c.scopes[c.scopeIndex]
+			if localIndex, ok := currentScope.symbolTable[n.Value.Value]; ok {
+				// 局部变量
+				c.Emit(bytecode.OpGetLocal, localIndex)
+			} else {
+				// 全局变量
+				pos = c.AddConstant(n.Value.Value)
+				c.Emit(bytecode.OpGetGlobal, pos)
+			}
+		default:
+			return nil, fmt.Errorf("unknown literal type: %s", n.Value.Type)
+		}
+		return pos, nil
 	})
 
 	return c

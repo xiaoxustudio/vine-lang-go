@@ -21,6 +21,8 @@ var definitions = map[Opcode]*Definition{
 	OpSetGlobal: {"OpSetGlobal", []int{2}, OpSetGlobal},
 	OpSetConst:  {"OpSetConst", []int{2}, OpSetConst},
 	OpGetGlobal: {"OpGetGlobal", []int{2}, OpGetGlobal},
+	OpGetLocal:  {"OpGetLocal", []int{2}, OpGetLocal},
+	OpSetLocal:  {"OpSetLocal", []int{2}, OpSetLocal},
 	OpCall:      {"OpCall", []int{2}, OpCall},
 	OpReturn:    {"OpReturn", nil, OpReturn},
 	OpIndex:     {"OpIndex", nil, OpIndex},

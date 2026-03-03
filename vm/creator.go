@@ -68,7 +68,16 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		var result any
 		var err error
 
-		if leftInt, ok := left.(int64); ok {
+		// 处理字符串连接
+		if leftStr, ok := left.(string); ok {
+			if rightStr, ok := right.(string); ok {
+				result = leftStr + rightStr
+			} else {
+				result = fmt.Sprintf("%s%v", leftStr, right)
+			}
+		} else if rightStr, ok := right.(string); ok {
+			result = fmt.Sprintf("%v%s", left, rightStr)
+		} else if leftInt, ok := left.(int64); ok {
 			if rightInt, ok := right.(int64); ok {
 				result = leftInt + rightInt
 			} else if rightFloat, ok := right.(float64); ok {
@@ -292,8 +301,11 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		value := v.pop()
 		// 从常量池中获取变量名
 		varName := v.constants[globalIndex].(string)
-		// 设置到环境中，使用Set方法来检查常量
-		v.env.Set(token.Token{Type: token.IDENT, Value: varName}, value)
+		// 使用 Define 方法来定义全局变量
+		err := v.env.Define(token.Token{Type: token.IDENT, Value: varName}, value)
+		if err != nil {
+			return nil, err
+		}
 		frame.ip += 3
 		return value, nil
 	})
@@ -335,6 +347,34 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		return value, nil
 	})
 
+	v.RegisterOpenCodeHandler(bytecode.OpGetLocal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取局部变量索引（使用Little Endian解码）
+		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		// 从栈中获取局部变量
+		// basePointer指向函数对象的位置
+		// 参数从basePointer+1开始
+		value := v.stack[frame.basePointer+1+localIndex]
+		// 压入栈
+		v.push(value)
+		frame.ip += 3
+		return value, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpSetLocal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取局部变量索引（使用Little Endian解码）
+		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		// 从栈中弹出值
+		value := v.pop()
+		// 设置局部变量
+		// basePointer指向函数对象的位置
+		// 参数从basePointer+1开始
+		v.stack[frame.basePointer+1+localIndex] = value
+		frame.ip += 3
+		return value, nil
+	})
+
 	v.RegisterOpenCodeHandler(bytecode.OpCall, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
 		// 从指令中读取参数数量（使用Little Endian解码）
@@ -346,18 +386,27 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		switch fn := fn.(type) {
 		case *bytecode.CompiledFunction:
 			// 创建新的帧
+			// 栈结构: [..., 函数对象, 参数1, 参数2, ...]
+			// sp指向参数后的位置
+			// 函数对象在 sp-argCount-1
+			// 第一个参数在 sp-argCount
 			newFrame := &Frame{
 				fn:          fn,
 				ip:          0,
-				basePointer: v.sp - argCount,
+				basePointer: v.sp - argCount - 1, // 指向函数对象的位置
 			}
-			v.pushFrame(fn)
+			v.frames = append(v.frames, newFrame)
+			v.frameIndex++
 			// 将参数从当前帧复制到新帧的栈中
+			// 栈结构: [..., 函数对象, 参数1, 参数2, ...]
+			// sp指向参数后的位置
 			for i := 0; i < argCount; i++ {
-				v.stack[newFrame.basePointer+i] = v.stack[v.sp-argCount+i]
+				argValue := v.stack[v.sp-argCount+i]
+				v.stack[newFrame.basePointer+1+i] = argValue // 参数从函数对象后面开始
 			}
 			// 清除栈上的函数和参数
-			v.sp = newFrame.basePointer
+			// 设置栈指针到参数之后的位置，避免覆盖参数
+			v.sp = newFrame.basePointer + argCount + 1
 		case func(...any) (any, error):
 			// 处理Go函数调用
 			args := make([]any, argCount)
