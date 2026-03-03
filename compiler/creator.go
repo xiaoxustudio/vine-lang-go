@@ -510,7 +510,7 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 	c.RegisterStmtHandler(ast.NodeTypeProperty, func(node ast.Node) (any, error) {
 		n := node.(*ast.Property)
-		// 对于数组元素，只需要编译 Value，不需要编译 Key（索引）
+		// 编译值
 		_, err := c.Compile(n.Value)
 		if err != nil {
 			return nil, err
@@ -527,6 +527,33 @@ func NewCompiler(e *env.Environment) *Compiler {
 			}
 		}
 		c.Emit(bytecode.OpArray, len(n.Items))
+		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeObjectExpr, func(node ast.Node) (any, error) {
+		n := node.(*ast.ObjectExpr)
+		// 编译每个属性的键和值
+		for _, prop := range n.Properties {
+			// 编译键
+			if prop.Key.Value.Type == token.IDENT {
+				// 标识符键，直接压入字符串
+				keyName := prop.Key.Value.Value
+				pos := c.AddConstant(keyName)
+				c.Emit(bytecode.OpConstant, pos)
+			} else {
+				// 字面量键，编译键表达式
+				_, err := c.Compile(prop.Key)
+				if err != nil {
+					return nil, err
+				}
+			}
+			// 编译值
+			_, err := c.Compile(prop.Value)
+			if err != nil {
+				return nil, err
+			}
+		}
+		c.Emit(bytecode.OpObject, len(n.Properties))
 		return nil, nil
 	})
 

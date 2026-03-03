@@ -465,7 +465,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpJump, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取跳转偏移量（使用Little Endian解码）
+		// 从指令中读取跳转偏移量
 		offset := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		frame.ip += offset
 		return nil, nil
@@ -473,7 +473,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetGlobal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取全局变量索引（使用Little Endian解码）
+
 		globalIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if globalIndex >= len(v.constants) {
 			return nil, fmt.Errorf("global index %d out of range", globalIndex)
@@ -493,7 +493,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetConst, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取常量索引（使用Little Endian解码）
+		// 从指令中读取常量索引
 		constIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if constIndex >= len(v.constants) {
 			return nil, fmt.Errorf("constant index %d out of range", constIndex)
@@ -510,7 +510,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpGetGlobal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取全局变量索引（使用Little Endian解码）
+
 		globalIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if globalIndex >= len(v.constants) {
 			return nil, fmt.Errorf("global index %d out of range", globalIndex)
@@ -530,7 +530,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpGetLocal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取局部变量索引（使用Little Endian解码）
+
 		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中获取局部变量
 		// basePointer指向函数对象的位置
@@ -544,7 +544,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetLocal, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取局部变量索引（使用Little Endian解码）
+
 		localIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中弹出值
 		value := v.pop()
@@ -558,7 +558,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpCall, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取参数数量（使用Little Endian解码）
+		// 从指令中读取参数数量
 		argCount := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中弹出函数
 		fn := v.stack[v.sp-1-argCount]
@@ -659,7 +659,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpGetMember, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取属性名索引（使用Little Endian解码）
+		// 从指令中读取属性名索引
 		memberIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if memberIndex >= len(v.constants) {
 			return nil, fmt.Errorf("member index %d out of range", memberIndex)
@@ -800,7 +800,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpSetMember, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取属性名索引（使用Little Endian解码）
+		// 从指令中读取属性名索引
 		memberIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		if memberIndex >= len(v.constants) {
 			return nil, fmt.Errorf("member index %d out of range", memberIndex)
@@ -844,7 +844,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 
 	v.RegisterOpenCodeHandler(bytecode.OpArray, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
-		// 从指令中读取数组长度（使用Little Endian解码）
+		// 从指令中读取数组长度
 		length := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
 		// 从栈中弹出数组元素
 		array := make([]any, length)
@@ -855,6 +855,39 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		v.push(array)
 		frame.ip += 3
 		return array, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpObject, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取对象属性数量
+		propCount := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		// 创建对象map
+		obj := make(map[string]any)
+		// 从栈中弹出属性值和键
+		for i := 0; i < propCount; i++ {
+			// 弹出值
+			value := v.pop()
+			// 弹出键
+			key := v.pop()
+			// 将键转换为字符串
+			var keyStr string
+			switch k := key.(type) {
+			case string:
+				keyStr = k
+			case int64:
+				keyStr = fmt.Sprintf("%d", k)
+			case float64:
+				keyStr = fmt.Sprintf("%.0f", k)
+			default:
+				return nil, fmt.Errorf("object key must be string or number, got %T", key)
+			}
+			// 设置属性
+			obj[keyStr] = value
+		}
+		// 将对象压入栈
+		v.push(obj)
+		frame.ip += 3
+		return obj, nil
 	})
 
 	return v

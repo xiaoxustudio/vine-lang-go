@@ -32,6 +32,7 @@ var definitions = map[Opcode]*Definition{
 	OpIncrement: {"OpIncrement", nil, OpIncrement},
 	OpDecrement: {"OpDecrement", nil, OpDecrement},
 	OpArray:     {"OpArray", []int{2}, OpArray},
+	OpObject:    {"OpObject", []int{2}, OpObject},
 }
 
 func Lookup(op Opcode, constants []any) (*Definition, error) {

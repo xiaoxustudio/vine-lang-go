@@ -46,6 +46,7 @@ const (
 
 	/* 结构 */
 	OpArray
+	OpObject
 )
 
 type Instructions []byte // 单个指令
