@@ -1,5 +1,5 @@
 use glb pick print
 
 cst a = [1 ,"123",3]
-a = 1
+
 print(a)

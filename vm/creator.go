@@ -485,6 +485,129 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		return value, err
 	})
 
+	v.RegisterOpenCodeHandler(bytecode.OpIndex, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从栈中弹出索引
+		index := v.pop()
+		// 从栈中弹出数组/对象
+		obj := v.pop()
+
+		var value any
+		var err error
+
+		switch obj := obj.(type) {
+		case []any:
+			// 数组索引访问
+			idx, ok := index.(int64)
+			if !ok {
+				return nil, fmt.Errorf("array index must be integer, got %T", index)
+			}
+			if idx < 0 || int(idx) >= len(obj) {
+				return nil, fmt.Errorf("array index %d out of range", idx)
+			}
+			value = obj[idx]
+		case map[string]any:
+			// map索引访问
+			key, ok := index.(string)
+			if !ok {
+				return nil, fmt.Errorf("map key must be string, got %T", index)
+			}
+			var exists bool
+			value, exists = obj[key]
+			if !exists {
+				return nil, fmt.Errorf("key %s not found in map", key)
+			}
+		default:
+			return nil, fmt.Errorf("cannot index type %T", obj)
+		}
+
+		// 将获取的值压入栈
+		v.push(value)
+		frame.ip += 1
+		return value, err
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpSetIndex, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从栈中弹出要设置的值
+		value := v.pop()
+		// 从栈中弹出索引
+		index := v.pop()
+		// 从栈中弹出数组/对象
+		obj := v.pop()
+
+		switch obj := obj.(type) {
+		case []any:
+			// 数组索引设置
+			idx, ok := index.(int64)
+			if !ok {
+				return nil, fmt.Errorf("array index must be integer, got %T", index)
+			}
+			if idx < 0 || int(idx) >= len(obj) {
+				return nil, fmt.Errorf("array index %d out of range", idx)
+			}
+			obj[idx] = value
+		case map[string]any:
+			// map索引设置
+			key, ok := index.(string)
+			if !ok {
+				return nil, fmt.Errorf("map key must be string, got %T", index)
+			}
+			obj[key] = value
+		default:
+			return nil, fmt.Errorf("cannot set index on type %T", obj)
+		}
+
+		// 将设置的值压入栈
+		v.push(value)
+		frame.ip += 1
+		return value, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpSetMember, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.currentFrame()
+		// 从指令中读取属性名索引（使用Little Endian解码）
+		memberIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		if memberIndex >= len(v.constants) {
+			return nil, fmt.Errorf("member index %d out of range", memberIndex)
+		}
+		// 从常量池中获取属性名
+		memberName := v.constants[memberIndex].(string)
+		// 从栈中弹出要设置的值
+		value := v.pop()
+		// 从栈中弹出对象
+		obj := v.pop()
+
+		switch obj := obj.(type) {
+		case *store.StoreObject:
+			// 设置存储对象的属性
+			obj.Define(token.Token{Type: token.IDENT, Value: memberName}, value)
+		case map[string]any:
+			// 设置map的属性
+			obj[memberName] = value
+		default:
+			// 使用反射设置属性
+			r := reflect.ValueOf(obj)
+			if r.Kind() == reflect.Pointer {
+				r = r.Elem()
+			}
+			if r.Kind() == reflect.Struct {
+				// 结构体字段不可修改，返回错误
+				return nil, fmt.Errorf("cannot set member on struct")
+			} else if r.Kind() == reflect.Map {
+				// 设置map的值
+				r.SetMapIndex(reflect.ValueOf(memberName), reflect.ValueOf(value))
+			} else {
+				return nil, fmt.Errorf("cannot set member on type %T", obj)
+			}
+		}
+
+		// 将设置的值压入栈
+		v.push(value)
+		frame.ip += 3
+		return value, nil
+	})
+
 	v.RegisterOpenCodeHandler(bytecode.OpArray, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.currentFrame()
 		// 从指令中读取数组长度（使用Little Endian解码）

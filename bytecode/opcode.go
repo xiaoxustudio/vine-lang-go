@@ -30,7 +30,9 @@ const (
 	OpCall
 	OpReturn
 	OpIndex // 索引
+	OpSetIndex // 设置索引
 	OpGetMember
+	OpSetMember // 设置成员
 
 	/* 结构 */
 	OpArray
