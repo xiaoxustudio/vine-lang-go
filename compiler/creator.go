@@ -44,6 +44,12 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 	c.RegisterStmtHandler(ast.NodeTypeBlockStmt, func(node ast.Node) (any, error) {
 		n := node.(*ast.BlockStmt)
+
+		// 进入新的作用域
+		// 使用当前作用域的环境
+		currentEnv := c.scopes[c.scopeIndex].env
+		c.EnterScope(currentEnv)
+
 		for _, s := range n.Body {
 			// 跳过注释语句
 			if _, ok := s.(*ast.CommentStmt); ok {
@@ -54,6 +60,19 @@ func NewCompiler(e *env.Environment) *Compiler {
 				return nil, err
 			}
 		}
+
+		// 退出作用域，并保存指令
+		scope := c.LeaveScope()
+
+		// 将指令传递给父作用域
+		if scope != nil && len(scope.instructions) > 0 {
+			// 将当前作用域的指令添加到父作用域
+			parentScope := c.CurrentScope()
+			if parentScope != nil {
+				parentScope.instructions = append(parentScope.instructions, scope.instructions...)
+			}
+		}
+
 		return nil, nil
 	})
 
@@ -81,22 +100,29 @@ func NewCompiler(e *env.Environment) *Compiler {
 	c.RegisterStmtHandler(ast.NodeTypeFunctionDecl, func(node ast.Node) (any, error) {
 		n := node.(*ast.FunctionDecl)
 
-		// 保存当前作用域
-		currentScopeIndex := c.scopeIndex
-
-		// 创建新的编译作用域用于函数体
-		c.NewScope(c.scopes[currentScopeIndex].env)
+		// 进入新的编译作用域用于函数体
+		// 使用当前作用域的环境
+		currentEnv := c.scopes[c.scopeIndex].env
+		c.EnterScope(currentEnv)
 
 		// 获取函数作用域
-		funcScope := c.scopes[c.scopeIndex]
+		funcScope := c.CurrentScope()
 
 		// 处理函数参数，将参数名添加到符号表
-		for i, arg := range n.Arguments.Arguments {
+		for _, arg := range n.Arguments.Arguments {
 			if lit, ok := arg.(*ast.Literal); ok && lit.Value.Type == token.IDENT {
 				paramName := lit.Value.Value
-				funcScope.symbolTable[paramName] = i
+				c.DefineLocal(paramName)
 			}
 		}
+
+		// 编译函数体
+		// 注意：函数体可能是一个块语句，会创建新的作用域
+		// 我们需要捕获这些作用域的指令
+		var allInstructions []byte
+
+		// 保存编译前的 scopeIndex
+		beforeCompileScopeIndex := c.scopeIndex
 
 		// 编译函数体
 		_, err := c.Compile(n.Body)
@@ -104,15 +130,33 @@ func NewCompiler(e *env.Environment) *Compiler {
 			return nil, err
 		}
 
-		// 获取函数体的指令
-		instructions := funcScope.instructions
+		// 检查是否有新的作用域被创建
+		if c.scopeIndex > beforeCompileScopeIndex {
+			// 有新的作用域被创建，我们需要捕获这些作用域的指令
+			// 注意：这些作用域已经被 LeaveScope 移除了，所以我们无法直接访问
+			// 我们需要修改 LeaveScope 的行为，或者在这里手动处理
 
-		// 恢复到父作用域
-		c.scopeIndex = currentScopeIndex
+			// 由于作用域已经被移除，我们需要从编译结果中获取指令
+			// 但编译结果没有返回指令，所以我们需要另一种方法
+			// 让我们看看编译函数体后，当前作用域的指令
+			currentScope := c.CurrentScope()
+			if len(currentScope.instructions) > 0 {
+				allInstructions = append(allInstructions, currentScope.instructions...)
+			}
+		} else {
+			// 没有新的作用域被创建，直接使用当前作用域的指令
+			currentScope := c.CurrentScope()
+			allInstructions = currentScope.instructions
+		}
+
+		// 退出所有嵌套的作用域，直到回到函数声明之前的作用域
+		for c.scopeIndex >= 0 && c.scopes[c.scopeIndex] != funcScope.parent {
+			c.LeaveScope()
+		}
 
 		// 创建函数对象
 		fn := &bytecode.CompiledFunction{
-			Instructions:  instructions,
+			Instructions:  allInstructions,
 			NumLocals:     len(funcScope.symbolTable),
 			NumParameters: len(n.Arguments.Arguments),
 		}
@@ -478,11 +522,11 @@ func NewCompiler(e *env.Environment) *Compiler {
 			pos = c.AddConstant(v)
 			c.Emit(bytecode.OpConstant, pos)
 		case token.IDENT:
-			// 检查是否为局部变量
-			currentScope := c.scopes[c.scopeIndex]
-			if localIndex, ok := currentScope.symbolTable[n.Value.Value]; ok {
+			// 使用 ResolveVariable 解析变量
+			isLocal, index := c.ResolveVariable(n.Value.Value)
+			if isLocal {
 				// 局部变量
-				c.Emit(bytecode.OpGetLocal, localIndex)
+				c.Emit(bytecode.OpGetLocal, index)
 			} else {
 				// 全局变量
 				pos = c.AddConstant(n.Value.Value)

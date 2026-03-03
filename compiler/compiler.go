@@ -27,6 +27,7 @@ type CompilationScope struct {
 	lastIns      EmittedInstruction
 	env          env.Environment
 	symbolTable  map[string]int // 局部变量符号表，记录变量名到索引的映射
+	parent       *CompilationScope // 父作用域
 }
 
 type EmittedInstruction struct {
@@ -38,15 +39,41 @@ func (c *Compiler) GetConstantRaw() []any {
 	return c.constants
 }
 
-func (c *Compiler) NewScope(e env.Environment) *CompilationScope {
+// EnterScope 进入新的作用域
+func (c *Compiler) EnterScope(e env.Environment) *CompilationScope {
 	scope := &CompilationScope{
 		instructions: bytecode.Instructions{},
 		env:          e,
 		symbolTable:  make(map[string]int),
 	}
+
+	// 如果有父作用域，设置父作用域
+	if c.scopeIndex >= 0 {
+		scope.parent = c.scopes[c.scopeIndex]
+	}
+
+	// 先将作用域添加到数组中
 	c.scopes = append(c.scopes, scope)
-	c.scopeIndex++
+	// 再更新索引，指向新添加的作用域
+	c.scopeIndex = len(c.scopes) - 1
 	return scope
+}
+
+// LeaveScope 退出当前作用域，返回当前作用域
+func (c *Compiler) LeaveScope() *CompilationScope {
+	if c.scopeIndex < 0 {
+		return nil
+	}
+
+	scope := c.scopes[c.scopeIndex]
+	c.scopes = c.scopes[:c.scopeIndex]
+	c.scopeIndex--
+	return scope
+}
+
+// NewScope 兼容旧的方法，调用 EnterScope
+func (c *Compiler) NewScope(e env.Environment) *CompilationScope {
+	return c.EnterScope(e)
 }
 
 func (c *Compiler) Compile(node ast.Node) (any, error) {
@@ -84,6 +111,46 @@ func (c *Compiler) Emit(op bytecode.Opcode, operands ...int) int {
 	currentScope := c.scopes[c.scopeIndex]
 	currentScope.instructions = append(currentScope.instructions, ins...)
 	return len(currentScope.instructions) - len(ins)
+}
+
+// DefineLocal 在当前作用域定义局部变量
+func (c *Compiler) DefineLocal(name string) int {
+	currentScope := c.scopes[c.scopeIndex]
+	index := len(currentScope.symbolTable)
+	currentScope.symbolTable[name] = index
+	return index
+}
+
+// ResolveVariable 解析变量，返回变量的类型（全局或局部）和索引
+func (c *Compiler) ResolveVariable(name string) (isLocal bool, index int) {
+	// 从当前作用域开始，向上查找
+	for i := c.scopeIndex; i >= 0; i-- {
+		scope := c.scopes[i]
+		if idx, ok := scope.symbolTable[name]; ok {
+			// 如果在当前作用域或其父作用域中找到，则是局部变量
+			// 对于函数作用域，所有参数和局部变量都是局部的
+			return true, idx
+		}
+	}
+
+	// 没有在任何作用域中找到，是全局变量
+	return false, -1
+}
+
+// CurrentScope 返回当前作用域
+func (c *Compiler) CurrentScope() *CompilationScope {
+	if c.scopeIndex < 0 {
+		return nil
+	}
+	return c.scopes[c.scopeIndex]
+}
+
+// ParentScope 返回当前作用域的父作用域
+func (c *Compiler) ParentScope() *CompilationScope {
+	if c.scopeIndex < 1 {
+		return nil
+	}
+	return c.scopes[c.scopeIndex-1]
 }
 
 func (c Compiler) Dismassemble() string {

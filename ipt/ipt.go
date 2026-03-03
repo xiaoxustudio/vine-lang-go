@@ -1249,9 +1249,7 @@ func (i *Interpreter) EvalSafe() (any, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	println("vm 返回:", fmt.Sprintf("%v", v))
-
 	// 保证所有任务都执行完毕
 	task.WaitAll()
 
