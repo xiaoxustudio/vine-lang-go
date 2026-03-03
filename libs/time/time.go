@@ -34,9 +34,9 @@ func (g *TimeModule) IsInside() bool {
 }
 
 /* FN */
-func Now(env any) any {
+func Now() any {
 	return time.Now().Unix()
 }
-func Milli(env any) any {
+func Milli() any {
 	return time.Now().UnixMilli()
 }
