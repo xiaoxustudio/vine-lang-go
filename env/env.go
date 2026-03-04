@@ -20,6 +20,9 @@ type ExecuteCodeFunc func(filename string, code string, wk Workspace) (any, erro
 
 var executeCode ExecuteCodeFunc
 
+// 全局导入栈，用于检测循环依赖
+var globalImportStack []string
+
 func SetExecuteCode(fn ExecuteCodeFunc) {
 	executeCode = fn
 }
@@ -33,15 +36,15 @@ func ExecuteCode(filename string, code string, wk Workspace) (any, error) {
 
 type Environment struct {
 	types.Scope
-	parent     *Environment
-	store      map[string]any
-	nameMap    map[string]Token
-	consts     map[string]struct{}
-	FileName   string
-	MountScope types.Scope // 挂载的Scope，可能是对象什么的
-	WorkSpace  Workspace
-	Exports    *store.StoreObject
-	isPassing  bool // 是否正在定义临时参数，将不查找父级
+	parent        *Environment
+	store         map[string]any
+	nameMap       map[string]Token
+	consts        map[string]struct{}
+	FileName      string
+	MountScope    types.Scope // 挂载的Scope，可能是对象什么的
+	WorkSpace     Workspace
+	Exports       *store.StoreObject
+	isPassing     bool // 是否正在定义临时参数，将不查找父级
 }
 
 func New(workspace Workspace) *Environment {
@@ -262,6 +265,26 @@ func (e *Environment) CallFuncObject(fnObject any, args []any) (any, error) {
 func (e *Environment) ImportModule(name string) (any, error) {
 	tk := Token{Type: token.IDENT, Value: name}
 
+	wk := e.GetWorkSpace()
+	fullPath := filepath.Join(wk.GetBasePath(), name)
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return nil, verror.InterpreterVError{
+			Position: Token{}.ToPosition(e.FileName),
+			Message:  fmt.Sprintf("failed to resolve absolute path for %s: %v", LibsUtils.TrasformPrintString(name), err),
+		}
+	}
+
+	// 检查循环依赖
+	for _, imported := range globalImportStack {
+		if imported == absPath {
+			return nil, verror.InterpreterVError{
+				Position: Token{}.ToPosition(e.FileName),
+				Message:  fmt.Sprintf("circular dependency detected: %s", LibsUtils.TrasformPrintString(name)),
+			}
+		}
+	}
+
 	if existed, ok := e.Get(tk); ok {
 		if _, isMod := existed.(types.LibsModule); isMod {
 			// 模块已存在，也在当前环境中定义它
@@ -274,8 +297,6 @@ func (e *Environment) ImportModule(name string) (any, error) {
 		return v, nil
 	}
 
-	wk := e.GetWorkSpace()
-	fullPath := filepath.Join(wk.GetBasePath(), name)
 	code, err := os.ReadFile(fullPath)
 
 	if err != nil {
@@ -294,11 +315,15 @@ func (e *Environment) ImportModule(name string) (any, error) {
 	oldFileName := e.FileName
 	oldBasePath := wk.GetBasePath()
 
+	// 将当前模块的绝对路径加入全局导入栈
+	globalImportStack = append(globalImportStack, absPath)
 	e.FileName = name
 	wk.Cd(filepath.Dir(name))
 
 	result, execErr := ExecuteCode(name, string(code), wk)
 
+	// 从全局导入栈中移除当前模块名
+	globalImportStack = globalImportStack[:len(globalImportStack)-1]
 	e.FileName = oldFileName
 	wk.Cd(oldBasePath)
 
