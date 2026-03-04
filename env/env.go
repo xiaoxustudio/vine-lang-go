@@ -306,6 +306,13 @@ func (e *Environment) ImportModule(name string) (any, error) {
 		return nil, execErr
 	}
 
+	// 如果是 UserModule，将导出的内容直接定义到当前环境中
+	if userMod, ok := result.(*types.UserModule); ok {
+		userMod.Store.ForEach(func(tk token.Token, val any) {
+			e.DefineFast(tk.Value, val)
+		})
+	}
+
 	e.Define(tk, result)
 
 	return result, nil

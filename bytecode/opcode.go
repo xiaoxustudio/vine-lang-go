@@ -48,6 +48,7 @@ const (
 	OpSetIndex // 设置索引
 	OpGetMember
 	OpSetMember // 设置成员
+	OpExpose // 导出变量
 
 	/* 结构 */
 	OpArray

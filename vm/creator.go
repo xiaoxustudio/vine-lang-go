@@ -590,7 +590,12 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		// 从环境中获取值
 		value, ok := v.env.GetFast(varName)
 		if !ok {
-			return nil, fmt.Errorf("variable %s not found", varName)
+			// 如果在当前环境中找不到，尝试从导入的模块中查找
+			nameToken := token.Token{Type: token.IDENT, Value: varName}
+			value, ok = v.env.Get(nameToken)
+			if !ok {
+				return nil, fmt.Errorf("variable %s not found", varName)
+			}
 		}
 		// 压入栈
 		v.push(value)
@@ -909,6 +914,42 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		}
 
 		// 将设置的值压入栈
+		v.push(value)
+		frame.ip += 3
+		return value, nil
+	})
+
+	v.RegisterOpenCodeHandler(bytecode.OpExpose, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		frame := v.frames[v.frameIndex]
+
+		// 从指令中读取变量名索引
+		nameIndex := int(binary.LittleEndian.Uint16(ins[frame.ip+1:]))
+		if nameIndex >= len(v.constants) {
+			return nil, fmt.Errorf("name index %d out of range", nameIndex)
+		}
+
+		// 从常量池中获取变量名
+		varName := v.constants[nameIndex].(string)
+
+		// 从环境中获取变量值
+		nameToken := token.Token{Type: token.IDENT, Value: varName}
+		value, exists := v.env.Get(nameToken)
+		if !exists {
+			return nil, fmt.Errorf("variable not found: %s", varName)
+		}
+
+		// 确保 Exports 对象存在
+		if v.env.Exports == nil {
+			v.env.Exports = store.NewStoreObject()
+		}
+
+		// 将变量添加到导出列表
+		err := v.env.Exports.Define(nameToken, value)
+		if err != nil {
+			return nil, err
+		}
+
+		// 将导出的值压入栈
 		v.push(value)
 		frame.ip += 3
 		return value, nil

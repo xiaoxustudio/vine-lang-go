@@ -1,4 +1,9 @@
 use glb pick print
+use "./module.vine"
+use "./module.vine" as module
 use time
 
+
+print(module.STATE.a)
+print(STATE.a)
 print(time.Milli())
