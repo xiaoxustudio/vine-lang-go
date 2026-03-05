@@ -673,8 +673,17 @@ func NewCompiler(e *env.Environment) *Compiler {
 				// 保存跳转位置和占位的case体位置（稍后修复）
 				currentScope.jumpPositions = append(currentScope.jumpPositions, jumpIfTruePos)
 				currentScope.jumpPositions = append(currentScope.jumpPositions, -1) // 占位，稍后修复为case体开始位置
-				// 注意：OpJumpIfTrue已经弹出了比较结果，所以不需要额外的OpPop
 			}
+
+			// 所有条件都不匹配，跳过当前case
+			// 先占位，稍后填充跳转位置
+			skipCaseJumpPos := c.Emit(bytecode.OpJump, 9999)
+			// 保存跳过当前case的跳转位置和特殊标记（-2表示这是跳过case的跳转）
+			if currentScope.jumpPositions == nil {
+				currentScope.jumpPositions = make([]int, 0)
+			}
+			currentScope.jumpPositions = append(currentScope.jumpPositions, skipCaseJumpPos)
+			currentScope.jumpPositions = append(currentScope.jumpPositions, -2)
 		} else {
 			// default case，直接跳转到这里
 			// 需要从switch语句中获取跳转位置
@@ -694,8 +703,13 @@ func NewCompiler(e *env.Environment) *Compiler {
 			return nil, err
 		}
 
-		// case体执行完后，需要弹出测试值（因为我们在比较前用OpDup复制了它）
+		// case体执行完后，需要弹出所有测试值副本
 		if !n.IsDefault {
+			// 每个条件比较前复制了一次测试值，所以需要弹出 len(n.Conds) 个测试值副本
+			for i := 0; i < len(n.Conds); i++ {
+				c.Emit(bytecode.OpPop)
+			}
+			// 还需要弹出原始的测试值
 			c.Emit(bytecode.OpPop)
 		}
 
@@ -712,8 +726,10 @@ func NewCompiler(e *env.Environment) *Compiler {
 
 		if !n.IsDefault {
 			// 找到所有属于这个case的条件跳转
-			startIndex := len(currentScope.jumpPositions) - 2 - 2*len(n.Conds)
-			for i := startIndex; i >= 0 && i < len(currentScope.jumpPositions)-2; i += 2 {
+			// 在编译这个case之前，jumpPositions的长度
+			beforeCasePos := len(currentScope.jumpPositions) - 2*len(n.Conds) - 2
+			// 遍历当前case的所有条件跳转
+			for i := beforeCasePos; i < len(currentScope.jumpPositions)-2; i += 2 {
 				jumpPos := currentScope.jumpPositions[i]
 				// 检查这是否是条件跳转
 				op := bytecode.Opcode(currentScope.instructions[jumpPos])
@@ -785,6 +801,18 @@ func NewCompiler(e *env.Environment) *Compiler {
 				if targetPos == -1 {
 					// case体结束的跳转，跳转到switch结束位置
 					offset := uint16(switchEndPos - jumpPos)
+					binary.LittleEndian.PutUint16(currentScope.instructions[jumpPos+1:], offset)
+				} else if targetPos == -2 {
+					// 跳过当前case的跳转，跳转到下一个case的开始位置
+					// 找到下一个case的开始位置
+					nextCasePos := switchEndPos
+					for j := i + 2; j < len(currentScope.jumpPositions); j += 2 {
+						if currentScope.jumpPositions[j+1] != -1 && currentScope.jumpPositions[j+1] != -2 {
+							nextCasePos = currentScope.jumpPositions[j+1]
+							break
+						}
+					}
+					offset := uint16(nextCasePos - jumpPos)
 					binary.LittleEndian.PutUint16(currentScope.instructions[jumpPos+1:], offset)
 				} else {
 					// 跳转到default case

@@ -251,11 +251,13 @@ func (v *VM) Run() (any, error) {
 			frame.ip += 1
 			result = cmpResult
 		case bytecode.OpEqual:
+			// 弹出栈顶两个值进行比较
 			v.sp -= 2
 			right := v.stack[v.sp+1]
 			left := v.stack[v.sp]
 			var cmpResult bool
 
+			// 比较两个值
 			switch left := left.(type) {
 			case int64:
 				switch right := right.(type) {
@@ -277,6 +279,7 @@ func (v *VM) Run() (any, error) {
 				}
 			}
 
+			// 将比较结果压入栈顶
 			v.stack[v.sp] = cmpResult
 			v.sp++
 			frame.ip += 1
