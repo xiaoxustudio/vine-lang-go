@@ -645,6 +645,162 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return c.Compile(n.Expression)
 	})
 
+	c.RegisterStmtHandler(ast.NodeTypeSwitchCase, func(node ast.Node) (any, error) {
+		n := node.(*ast.SwitchCase)
+		currentScope := c.CurrentScope()
+
+		// 如果不是default case，需要比较条件
+		if !n.IsDefault {
+			// 对每个条件进行比较
+			for _, cond := range n.Conds {
+				// 复制switch的测试值到栈顶
+				// 使用OpDup指令复制栈顶值
+				c.Emit(bytecode.OpDup)
+				// 编译case条件
+				_, err := c.Compile(cond)
+				if err != nil {
+					return nil, err
+				}
+				// 比较测试值和case条件
+				c.Emit(bytecode.OpEqual)
+				// 如果相等，跳转到case体
+				// 先占位，稍后填充跳转位置
+				jumpIfTruePos := c.Emit(bytecode.OpJumpIfTrue, 9999)
+				// 保存跳转位置和对应的case体位置
+				if currentScope.jumpPositions == nil {
+					currentScope.jumpPositions = make([]int, 0)
+				}
+				// 保存跳转位置和占位的case体位置（稍后修复）
+				currentScope.jumpPositions = append(currentScope.jumpPositions, jumpIfTruePos)
+				currentScope.jumpPositions = append(currentScope.jumpPositions, -1) // 占位，稍后修复为case体开始位置
+				// 注意：OpJumpIfTrue已经弹出了比较结果，所以不需要额外的OpPop
+			}
+		} else {
+			// default case，直接跳转到这里
+			// 需要从switch语句中获取跳转位置
+			if currentScope.defaultCasePos == 0 {
+				currentScope.defaultCasePos = len(currentScope.instructions)
+				// default case需要弹出测试值，因为跳转时测试值还在栈上
+				c.Emit(bytecode.OpPop)
+			}
+		}
+
+		// 记录case体开始位置（在编译完所有条件之后）
+		caseBodyPos := len(currentScope.instructions)
+
+		// 编译语句块
+		_, err := c.Compile(n.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// case体执行完后，需要弹出测试值（因为我们在比较前用OpDup复制了它）
+		if !n.IsDefault {
+			c.Emit(bytecode.OpPop)
+		}
+
+		// case体执行完后，跳转到switch结束位置
+		// 先占位，稍后填充跳转位置
+		jumpPos := c.Emit(bytecode.OpJump, 9999)
+		// 保存跳转位置以便后续修复
+		if currentScope.jumpPositions == nil {
+			currentScope.jumpPositions = make([]int, 0)
+		}
+		// 保存跳转位置和特殊标记（-1表示这是case体结束的跳转）
+		currentScope.jumpPositions = append(currentScope.jumpPositions, jumpPos)
+		currentScope.jumpPositions = append(currentScope.jumpPositions, -1)
+
+		if !n.IsDefault {
+			// 找到所有属于这个case的条件跳转
+			startIndex := len(currentScope.jumpPositions) - 2 - 2*len(n.Conds)
+			for i := startIndex; i >= 0 && i < len(currentScope.jumpPositions)-2; i += 2 {
+				jumpPos := currentScope.jumpPositions[i]
+				// 检查这是否是条件跳转
+				op := bytecode.Opcode(currentScope.instructions[jumpPos])
+				if op == bytecode.OpJumpIfTrue {
+					// 更新跳转目标位置为case体开始位置
+					currentScope.jumpPositions[i+1] = caseBodyPos
+				}
+			}
+		}
+
+		return nil, nil
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeSwitchStmt, func(node ast.Node) (any, error) {
+		n := node.(*ast.SwitchStmt)
+		currentScope := c.CurrentScope()
+
+		// 保存当前的跳转位置列表和default case位置
+		oldJumpPositions := currentScope.jumpPositions
+		oldDefaultCasePos := currentScope.defaultCasePos
+		currentScope.jumpPositions = make([]int, 0)
+		currentScope.defaultCasePos = 0
+
+		// 编译条件表达式，结果压入栈顶
+		_, err := c.Compile(n.Test)
+		if err != nil {
+			return nil, err
+		}
+
+		// 编译每个case
+		for _, sc := range n.Cases {
+			_, err := c.Compile(&sc)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// 如果有default case，添加跳转到default case的指令
+		var defaultJumpPos int = -1
+		if currentScope.defaultCasePos != 0 {
+			// 所有case都不匹配时，跳转到default case
+			// 先占位，稍后填充跳转位置
+			defaultJumpPos = c.Emit(bytecode.OpJump, 9999)
+			// 保存跳转位置和default case位置
+			currentScope.jumpPositions = append(currentScope.jumpPositions, defaultJumpPos)
+			currentScope.jumpPositions = append(currentScope.jumpPositions, currentScope.defaultCasePos)
+		} else {
+			// 没有default case，弹出测试值
+			c.Emit(bytecode.OpPop)
+		}
+
+		// switch结束位置
+		switchEndPos := len(currentScope.instructions)
+
+		// jumpPositions数组格式: [jumpPos1, targetPos1, jumpPos2, targetPos2, ...]
+		for i := 0; i < len(currentScope.jumpPositions); i += 2 {
+			jumpPos := currentScope.jumpPositions[i]
+			targetPos := currentScope.jumpPositions[i+1]
+
+			// 检查这是哪种跳转
+			op := bytecode.Opcode(currentScope.instructions[jumpPos])
+			switch op {
+			case bytecode.OpJumpIfTrue:
+				// 条件跳转，跳转到对应的case体开始位置
+				offset := uint16(targetPos - jumpPos)
+				binary.LittleEndian.PutUint16(currentScope.instructions[jumpPos+1:], offset)
+			case bytecode.OpJump:
+				// 无条件跳转
+				if targetPos == -1 {
+					// case体结束的跳转，跳转到switch结束位置
+					offset := uint16(switchEndPos - jumpPos)
+					binary.LittleEndian.PutUint16(currentScope.instructions[jumpPos+1:], offset)
+				} else {
+					// 跳转到default case
+					offset := uint16(targetPos - jumpPos)
+					binary.LittleEndian.PutUint16(currentScope.instructions[jumpPos+1:], offset)
+				}
+			}
+		}
+
+		// 恢复之前的跳转位置列表和default case位置
+		currentScope.jumpPositions = oldJumpPositions
+		currentScope.defaultCasePos = oldDefaultCasePos
+
+		return nil, nil
+	})
+
 	c.RegisterStmtHandler(ast.NodeTypeAssignmentExpr, func(node ast.Node) (any, error) {
 		n := node.(*ast.AssignmentExpr)
 

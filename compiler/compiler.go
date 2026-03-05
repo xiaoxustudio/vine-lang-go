@@ -30,6 +30,8 @@ type CompilationScope struct {
 	symbolTable     map[string]int // 局部变量符号表，记录变量名到索引的映射
 	parent          *CompilationScope // 父作用域
 	constantValues  map[int]any // 局部变量的常量值，用于常量传播优化
+	jumpPositions   []int // 需要修复的跳转位置列表
+	defaultCasePos  int   // default case的位置
 }
 
 type EmittedInstruction struct {

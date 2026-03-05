@@ -468,6 +468,17 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		return nil, nil
 	})
 
+	v.RegisterOpenCodeHandler(bytecode.OpDup, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+		// 复制栈顶元素
+		if v.sp > 0 {
+			v.stack[v.sp] = v.stack[v.sp-1]
+			v.sp++
+		}
+		frame := v.frames[v.frameIndex]
+		frame.ip += 1
+		return nil, nil
+	})
+
 	v.RegisterOpenCodeHandler(bytecode.OpJump, func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 		frame := v.frames[v.frameIndex]
 		// 从指令中读取跳转偏移量

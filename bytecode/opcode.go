@@ -18,12 +18,13 @@ const (
 	OpMul
 	OpDiv
 	OpPop // 弹出栈顶元素
+	OpDup // 复制栈顶元素
 	OpJump
 	OpJumpIfFalse // 条件为假时跳转
 	OpJumpIfTrue  // 条件为真时跳转
-	OpLoop      // 循环跳转（跳转到循环开始）
-	OpBreak     // 跳出循环
-	OpContinue  // 跳到下一次迭代
+	OpLoop        // 循环跳转（跳转到循环开始）
+	OpBreak       // 跳出循环
+	OpContinue    // 跳到下一次迭代
 
 	OpIncrement // 自增
 	OpDecrement // 自减
@@ -44,15 +45,17 @@ const (
 	OpSetLocal // 设置局部变量
 	OpCall
 	OpReturn
-	OpIndex // 索引
+	OpIndex    // 索引
 	OpSetIndex // 设置索引
 	OpGetMember
 	OpSetMember // 设置成员
-	OpExpose // 导出变量
+	OpExpose    // 导出变量
 
 	/* 结构 */
 	OpArray
 	OpObject
+	OpSwitch
+	OpSwitchCase
 )
 
 type Instructions []byte // 单个指令

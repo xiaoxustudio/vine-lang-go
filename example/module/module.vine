@@ -1,0 +1,10 @@
+cst AA = 1
+
+expose STATE = {
+    a: 1,
+    b: 2,
+}
+
+expose fn add(a, b):
+    a + b
+end

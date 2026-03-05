@@ -434,40 +434,34 @@ func (i *Interpreter) EvalSwitchStmt(n *ast.SwitchStmt, env *environment.Environ
 	var defaultCase *ast.SwitchCase
 	var matched = false
 
-	for _, c := range n.Cases {
-		caseValue, ok := c.(*ast.SwitchCase)
-		if !ok {
-			return nil, i.Errorf(token.Token{}, "invalid switch case")
+	for _, caseValue := range n.Cases {
+		// 保存 default case 以便稍后处理
+		if caseValue.IsDefault {
+			defaultCase = &caseValue
+			continue
 		}
-		if caseValue != nil {
-			// 保存 default case 以便稍后处理
-			if caseValue.IsDefault {
-				defaultCase = caseValue
-				continue
-			}
 
-			// 检查条件是否匹配
-			for _, test := range caseValue.Conds {
-				testVal, err := i.Eval(test, env)
+		// 检查条件是否匹配
+		for _, test := range caseValue.Conds {
+			testVal, err := i.Eval(test, env)
+			if err != nil {
+				return nil, err
+			}
+			ok, err := utils.CompareVal(testVal, token.EQ, condVal)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				matched = true
+				_, err = i.Eval(caseValue.Body, env)
 				if err != nil {
-					return nil, err
-				}
-				ok, err := utils.CompareVal(testVal, token.EQ, condVal)
-				if err != nil {
-					return nil, err
-				}
-				if ok {
-					matched = true
-					_, err = i.Eval(caseValue.Body, env)
-					if err != nil {
-						// 检查是否是 break 语句
-						if vErr, ok := err.(verror.InterpreterVError); ok && vErr.Message == "break" {
-							return nil, nil
-						}
-						return nil, err
+					// 检查是否是 break 语句
+					if vErr, ok := err.(verror.InterpreterVError); ok && vErr.Message == "break" {
+						return nil, nil
 					}
-					break
+					return nil, err
 				}
+				break
 			}
 		}
 	}

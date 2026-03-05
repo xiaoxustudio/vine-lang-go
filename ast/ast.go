@@ -734,10 +734,10 @@ func (s *SwitchCase) String() string {
 type SwitchStmt struct {
 	BaseNode
 	Test  Expr
-	Cases []Expr
+	Cases []SwitchCase
 }
 
-func NewSwitchStmt(test Expr, cases []Expr) *SwitchStmt {
+func NewSwitchStmt(test Expr, cases []SwitchCase) *SwitchStmt {
 	return &SwitchStmt{
 		BaseNode: BaseNode{Type: NodeTypeSwitchStmt},
 		Test:     test,

@@ -250,6 +250,37 @@ func (v *VM) Run() (any, error) {
 			v.sp++
 			frame.ip += 1
 			result = cmpResult
+		case bytecode.OpEqual:
+			v.sp -= 2
+			right := v.stack[v.sp+1]
+			left := v.stack[v.sp]
+			var cmpResult bool
+
+			switch left := left.(type) {
+			case int64:
+				switch right := right.(type) {
+				case int64:
+					cmpResult = left == right
+				case float64:
+					cmpResult = float64(left) == right
+				}
+			case float64:
+				switch right := right.(type) {
+				case int64:
+					cmpResult = left == float64(right)
+				case float64:
+					cmpResult = left == right
+				}
+			case string:
+				if right, ok := right.(string); ok {
+					cmpResult = left == right
+				}
+			}
+
+			v.stack[v.sp] = cmpResult
+			v.sp++
+			frame.ip += 1
+			result = cmpResult
 		case bytecode.OpJumpIfFalse:
 			v.sp--
 			condition := v.stack[v.sp]
@@ -259,6 +290,18 @@ func (v *VM) Run() (any, error) {
 			} else {
 				frame.ip += 3
 			}
+		case bytecode.OpJumpIfTrue:
+			v.sp--
+			condition := v.stack[v.sp]
+			offset := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			if isTruthy(condition) {
+				frame.ip += offset
+			} else {
+				frame.ip += 3
+			}
+		case bytecode.OpJump:
+			offset := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			frame.ip += offset
 		case bytecode.OpLoop:
 			offset := int16(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
 			frame.ip += int(offset)

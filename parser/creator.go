@@ -190,16 +190,20 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		condition := p.parseExpression()
 		p.expect(token.COLON)
 		var isDefinedDefault bool = false
-		var cases []ast.Expr
+		var cases []ast.SwitchCase
 		for !p.isEof() && p.peek().Type != token.END {
 			var expr = p.parseSwitchCase()
 			if isDefinedDefault {
 				panic("default case already defined")
 			}
 			if expr != nil {
-				cases = append(cases, expr)
-				if expr.(*ast.SwitchCase).IsDefault {
-					isDefinedDefault = true
+				if _case, ok := expr.(*ast.SwitchCase); ok {
+					cases = append(cases, *_case)
+					if expr.(*ast.SwitchCase).IsDefault {
+						isDefinedDefault = true
+					}
+				} else {
+					panic("expected switch case")
 				}
 			}
 		}
