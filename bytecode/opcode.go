@@ -54,8 +54,6 @@ const (
 	/* 结构 */
 	OpArray
 	OpObject
-	OpSwitch
-	OpSwitchCase
 )
 
 type Instructions []byte // 单个指令
