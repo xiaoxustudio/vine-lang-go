@@ -39,6 +39,7 @@ func Print(rangeArgs ...any) {
 	}
 
 	for _, arg := range rangeArgs {
+
 		if v, ok := arg.(*store.StoreObject); ok {
 			fmt.Print(store.StoreObjectToReadableJSON(v), " ")
 			continue

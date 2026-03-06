@@ -601,7 +601,7 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 		// 从环境中获取值
 		value, ok := v.env.GetFast(varName)
 		if !ok {
-			// 如果在当前环境中找不到，尝试从导入的模块中查找
+			// 如果在当前环境中找不到，尝试从父级中查找
 			nameToken := token.Token{Type: token.IDENT, Value: varName}
 			value, ok = v.env.Get(nameToken)
 			if !ok {

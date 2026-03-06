@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -82,6 +83,9 @@ func TrasformPrintStringWithColor(args ...any) string {
 			return fmt.Sprintf("%s%d%s", Color.Blue, current, "\033[0m")
 		case float32, float64:
 			return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
+		case map[string]any:
+			jsonBytes, _ := json.MarshalIndent(current, "", "  ")
+			return string(jsonBytes)
 		case token.Token:
 			switch current.Type {
 			case token.INT:

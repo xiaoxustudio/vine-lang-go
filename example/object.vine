@@ -9,7 +9,7 @@ let a = {
     d:[1,2,3]
 }
 
-# print(a)
+print(a)
 # print(a.d)
 # print(a.d.0)
 print(a.1)
