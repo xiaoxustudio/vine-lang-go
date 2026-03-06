@@ -673,6 +673,10 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 			// 调整栈指针，指向参数之后的位置
 			// 这样函数执行时可以从这个位置开始使用栈
 			v.sp = base + argCount
+			// 将参数复制到locals数组中
+			for i := 0; i < argCount; i++ {
+				v.locals[i] = v.stack[base+i]
+			}
 		case func(...any) (any, error):
 			// 处理Go函数调用
 			args := make([]any, argCount)

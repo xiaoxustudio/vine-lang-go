@@ -23,21 +23,22 @@ func HandleExposeStmt(c iface.CompilerInterface, node ast.Node) (any, error) {
 		// 处理变量或函数声明
 		switch decl := n.Decl.(type) {
 		case *ast.FunctionDecl:
-			// 编译函数定义，获取函数对象
-			fn, err := c.Compile(n.Decl)
+			// 先编译函数定义，这会将函数添加到环境中
+			_, err := c.Compile(n.Decl)
 			if err != nil {
 				return nil, err
 			}
 
 			// 将函数添加到导出列表
 			if decl.ID != nil && decl.ID.Value != nil {
-				if err := mainEnv.Exports.Define(*decl.ID.Value, fn); err != nil {
-					return nil, err
-				}
+				// 将函数名添加到常量池
+				namePos := c.AddConstant(decl.ID.Value.Value)
+				// 发出 OpExpose 指令，将函数添加到导出列表
+				c.Emit(bytecode.OpExpose, namePos)
 			}
 
 		case *ast.VariableDecl:
-			// 编译变量定义
+			// 先编译变量定义，这会将变量添加到环境中
 			_, err := c.Compile(n.Decl)
 			if err != nil {
 				return nil, err
