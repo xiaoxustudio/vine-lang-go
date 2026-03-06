@@ -1228,22 +1228,22 @@ func (i *Interpreter) EvalSafe() (any, error) {
 
 	// 编译字节码
 	c := compiler.NewCompiler(i.env)
-	println("开始编译")
+	// println("开始编译")
 	_, err := c.Compile(ast)
 	if err != nil {
 		fmt.Printf("编译出错: %v\n", err)
 		return nil, err
 	}
 	// 反射字节码
-	println(c.Dismassemble())
-	println("编译成功，开始vm执行")
+	// println(c.Dismassemble())
+	// println("编译成功，开始vm执行")
 	vv := vm.NewVM(c, i.env)
 
 	v, err := vv.Run()
 	if err != nil {
 		return nil, err
 	}
-	println("vm 返回:", fmt.Sprintf("%v", v))
+	// println("vm 返回:", fmt.Sprintf("%v", v))
 	// 保证所有任务都执行完毕
 	task.WaitAll()
 

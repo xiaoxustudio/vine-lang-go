@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"vine-lang/bytecode"
 	"vine-lang/env"
+	"vine-lang/token"
+	iface "vine-lang/vm/interface"
 )
 
 // isTruthy 判断值是否为真
@@ -27,29 +29,21 @@ func isTruthy(value any) bool {
 	}
 }
 
-type VMFunc func(v *VM, op bytecode.Opcode, ins bytecode.Instructions) (any, error)
-
 type VM struct {
 	constants []any
 	stack     []any
 	sp        int // stack pointer
 
-	frames     []*Frame // 函数调用栈
+	frames     []*iface.Frame // 函数调用栈
 	frameIndex int
 
-	globals  []any            // 全局变量
-	locals   []any            // 局部变量
-	handlers [256]VMFunc      // 使用数组代替map，避免哈希查找开销
-	env      *env.Environment // 环境引用
+	globals  []any             // 全局变量
+	locals   []any             // 局部变量
+	handlers [256]iface.VMFunc // 使用数组代替map，避免哈希查找开销
+	env      *env.Environment  // 环境引用
 }
 
-type Frame struct {
-	fn          *bytecode.CompiledFunction
-	ip          int // instruction pointer
-	basePointer int // 栈基址，用于局部变量
-}
-
-func (v *VM) RegisterOpenCodeHandler(op bytecode.Opcode, handler VMFunc) {
+func (v *VM) RegisterOpenCodeHandler(op bytecode.Opcode, handler iface.VMFunc) {
 	v.handlers[op] = handler
 }
 
@@ -61,45 +55,127 @@ func (v *VM) CallOpenCodeHandler(op bytecode.Opcode, ins bytecode.Instructions) 
 
 	return handler(v, op, ins)
 }
+
+// GetConstants 获取常量池
+func (v *VM) GetConstants() []any {
+	return v.constants
+}
+
+// GetStack 获取栈
+func (v *VM) GetStack() []any {
+	return v.stack
+}
+
+// GetSP 获取栈指针
+func (v *VM) GetSP() int {
+	return v.sp
+}
+
+// SetSP 设置栈指针
+func (v *VM) SetSP(sp int) {
+	v.sp = sp
+}
+
+// GetFrameIndex 获取帧索引
+func (v *VM) GetFrameIndex() int {
+	return v.frameIndex
+}
+
+// SetFrameIndex 设置帧索引
+func (v *VM) SetFrameIndex(index int) {
+	v.frameIndex = index
+}
+
+// GetFrames 获取帧数组
+func (v *VM) GetFrames() []*iface.Frame {
+	return v.frames
+}
+
+// SetFrames 设置帧数组
+func (v *VM) SetFrames(frames []*iface.Frame) {
+	v.frames = frames
+}
+
+// GetLocals 获取局部变量
+func (v *VM) GetLocals() []any {
+	return v.locals
+}
+
+// SetLocals 设置局部变量
+func (v *VM) SetLocals(locals []any) {
+	v.locals = locals
+}
+
+// GetEnv 获取环境
+func (v *VM) GetEnv() *env.Environment {
+	return v.env
+}
+
+// GetEnvVar 从环境获取变量
+func (v *VM) GetEnvVar(name string) (any, bool) {
+	nameToken := token.Token{Type: token.IDENT, Value: name}
+	return v.env.Get(nameToken)
+}
+
+// SetEnvVar 设置环境变量
+func (v *VM) SetEnvVar(name string, value any) error {
+	nameToken := token.Token{Type: token.IDENT, Value: name}
+	v.env.Set(nameToken, value)
+	return nil
+}
+
+// DefineEnvVar 定义环境变量
+func (v *VM) DefineEnvVar(name string, value any) error {
+	nameToken := token.Token{Type: token.IDENT, Value: name}
+	return v.env.Define(nameToken, value)
+}
+
+// DefineEnvConst 定义环境常量
+func (v *VM) DefineEnvConst(name string, value any) error {
+	nameToken := token.Token{Type: token.IDENT, Value: name}
+	v.env.DefineConst(nameToken, value)
+	return nil
+}
+
 func (v *VM) Run() (any, error) {
 	var result any
 	for v.frameIndex >= 0 {
 		frame := v.frames[v.frameIndex]
 		// 检查是否超出指令范围
-		if frame.ip >= len(frame.fn.Instructions) {
+		if frame.Ip >= len(frame.Fn.Instructions) {
 			break
 		}
-		opcode := bytecode.Opcode(frame.fn.Instructions[frame.ip])
+		opcode := bytecode.Opcode(frame.Fn.Instructions[frame.Ip])
 
 		switch opcode {
 		case bytecode.OpConstant:
-			constIndex := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			constIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
 			if constIndex >= len(v.constants) {
 				return nil, fmt.Errorf("constant index %d out of range", constIndex)
 			}
 			constant := v.constants[constIndex]
 			v.stack[v.sp] = constant
 			v.sp++
-			frame.ip += 3
+			frame.Ip += 3
 			result = constant
 		case bytecode.OpGetLocal:
-			localIndex := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			localIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
 			if localIndex >= len(v.locals) {
 				return nil, fmt.Errorf("local index %d out of range", localIndex)
 			}
 			value := v.locals[localIndex]
 			v.stack[v.sp] = value
 			v.sp++
-			frame.ip += 3
+			frame.Ip += 3
 			result = value
 		case bytecode.OpSetLocal:
-			localIndex := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			localIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
 			if localIndex >= len(v.locals) {
 				return nil, fmt.Errorf("local index %d out of range", localIndex)
 			}
 			v.sp--
 			v.locals[localIndex] = v.stack[v.sp]
-			frame.ip += 3
+			frame.Ip += 3
 		case bytecode.OpPlus, bytecode.OpMinus, bytecode.OpMul, bytecode.OpDiv:
 			v.sp -= 2
 			right := v.stack[v.sp+1]
@@ -221,7 +297,7 @@ func (v *VM) Run() (any, error) {
 			}
 			v.stack[v.sp] = calcResult
 			v.sp++
-			frame.ip += 1
+			frame.Ip += 1
 			result = calcResult
 		case bytecode.OpLessThan:
 			v.sp -= 2
@@ -248,7 +324,7 @@ func (v *VM) Run() (any, error) {
 
 			v.stack[v.sp] = cmpResult
 			v.sp++
-			frame.ip += 1
+			frame.Ip += 1
 			result = cmpResult
 		case bytecode.OpEqual:
 			// 弹出栈顶两个值进行比较
@@ -282,32 +358,32 @@ func (v *VM) Run() (any, error) {
 			// 将比较结果压入栈顶
 			v.stack[v.sp] = cmpResult
 			v.sp++
-			frame.ip += 1
+			frame.Ip += 1
 			result = cmpResult
 		case bytecode.OpJumpIfFalse:
 			v.sp--
 			condition := v.stack[v.sp]
-			offset := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
 			if !isTruthy(condition) {
-				frame.ip += offset
+				frame.Ip += offset
 			} else {
-				frame.ip += 3
+				frame.Ip += 3
 			}
 		case bytecode.OpJumpIfTrue:
 			v.sp--
 			condition := v.stack[v.sp]
-			offset := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
+			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
 			if isTruthy(condition) {
-				frame.ip += offset
+				frame.Ip += offset
 			} else {
-				frame.ip += 3
+				frame.Ip += 3
 			}
 		case bytecode.OpJump:
-			offset := int(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
-			frame.ip += offset
+			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
+			frame.Ip += offset
 		case bytecode.OpLoop:
-			offset := int16(binary.LittleEndian.Uint16(frame.fn.Instructions[frame.ip+1:]))
-			frame.ip += int(offset)
+			offset := int16(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
+			frame.Ip += int(offset)
 		case bytecode.OpIncrement:
 			v.sp--
 			val := v.stack[v.sp]
@@ -318,16 +394,16 @@ func (v *VM) Run() (any, error) {
 				v.stack[v.sp] = val + 1
 			}
 			v.sp++
-			frame.ip += 1
+			frame.Ip += 1
 		case bytecode.OpPop:
 			v.sp--
-			frame.ip += 1
+			frame.Ip += 1
 		default:
 			handler := v.handlers[opcode]
 			if handler == nil {
 				return nil, errors.New("unknown opcode")
 			}
-			r, err := handler(v, opcode, frame.fn.Instructions)
+			r, err := handler(v, opcode, frame.Fn.Instructions)
 			if err != nil {
 				return nil, err
 			}
@@ -337,13 +413,13 @@ func (v *VM) Run() (any, error) {
 	return result, nil
 }
 
-func (v *VM) pushFrame(fn *bytecode.CompiledFunction) {
+func (v *VM) PushFrame(fn *bytecode.CompiledFunction) {
 	v.frameIndex++
-	v.frames = append(v.frames, &Frame{fn: fn, ip: 0, basePointer: v.sp})
+	v.frames = append(v.frames, &iface.Frame{Fn: fn, Ip: 0, BasePointer: v.sp})
 }
 
-// currentFrame 获取当前帧，内联优化
-func (v *VM) currentFrame() *Frame {
+// CurrentFrame 获取当前帧，内联优化
+func (v *VM) CurrentFrame() *iface.Frame {
 	return v.frames[v.frameIndex]
 }
 
@@ -351,12 +427,12 @@ func (v *VM) RunLine(op bytecode.Opcode, ins bytecode.Instructions) (any, error)
 	return v.CallOpenCodeHandler(op, ins)
 }
 
-func (v *VM) push(value any) {
+func (v *VM) Push(value any) {
 	v.stack[v.sp] = value
 	v.sp++
 }
 
-func (v *VM) pop() any {
+func (v *VM) Pop() any {
 	v.sp--
 	value := v.stack[v.sp]
 	return value
