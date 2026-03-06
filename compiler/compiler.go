@@ -6,37 +6,20 @@ import (
 	"strings"
 	"vine-lang/ast"
 	"vine-lang/bytecode"
+	iface "vine-lang/compiler/interface"
 	"vine-lang/env"
 	"vine-lang/object/store"
 )
 
-type compileFunc func(node ast.Node) (any, error)
-
 type Compiler struct {
-	handlers     map[ast.NodeType]compileFunc // 编译器处理函数
-	constants    []any                        // 对应的常量池
-	instructions []bytecode.Instructions      // 字节码指令集
+	handlers     map[ast.NodeType]iface.CompileFunc // 编译器处理函数
+	constants    []any                              // 对应的常量池
+	instructions []bytecode.Instructions            // 字节码指令集
 
 	// 作用域 / 符号表
 	symbolTable *store.StoreObject
-	scopes      []*CompilationScope
+	scopes      []*iface.CompilationScope
 	scopeIndex  int
-}
-
-type CompilationScope struct {
-	instructions    bytecode.Instructions
-	lastIns         EmittedInstruction
-	env             env.Environment
-	symbolTable     map[string]int // 局部变量符号表，记录变量名到索引的映射
-	parent          *CompilationScope // 父作用域
-	constantValues  map[int]any // 局部变量的常量值，用于常量传播优化
-	jumpPositions   []int // 需要修复的跳转位置列表
-	defaultCasePos  int   // default case的位置
-}
-
-type EmittedInstruction struct {
-	Opcode   bytecode.Opcode
-	Position int
 }
 
 func (c *Compiler) GetConstantRaw() []any {
@@ -44,16 +27,16 @@ func (c *Compiler) GetConstantRaw() []any {
 }
 
 // EnterScope 进入新的作用域
-func (c *Compiler) EnterScope(e env.Environment) *CompilationScope {
-	scope := &CompilationScope{
-		instructions: bytecode.Instructions{},
-		env:          e,
-		symbolTable:  make(map[string]int),
+func (c *Compiler) EnterScope(e env.Environment) *iface.CompilationScope {
+	scope := &iface.CompilationScope{
+		Instructions: bytecode.Instructions{},
+		Env:          e,
+		SymbolTable:  make(map[string]int),
 	}
 
 	// 如果有父作用域，设置父作用域
 	if c.scopeIndex >= 0 {
-		scope.parent = c.scopes[c.scopeIndex]
+		scope.Parent = c.scopes[c.scopeIndex]
 	}
 
 	// 先将作用域添加到数组中
@@ -64,7 +47,7 @@ func (c *Compiler) EnterScope(e env.Environment) *CompilationScope {
 }
 
 // LeaveScope 退出当前作用域，返回当前作用域
-func (c *Compiler) LeaveScope() *CompilationScope {
+func (c *Compiler) LeaveScope() *iface.CompilationScope {
 	if c.scopeIndex < 0 {
 		return nil
 	}
@@ -76,7 +59,7 @@ func (c *Compiler) LeaveScope() *CompilationScope {
 }
 
 // NewScope 兼容旧的方法，调用 EnterScope
-func (c *Compiler) NewScope(e env.Environment) *CompilationScope {
+func (c *Compiler) NewScope(e env.Environment) *iface.CompilationScope {
 	return c.EnterScope(e)
 }
 
@@ -84,7 +67,7 @@ func (c *Compiler) Compile(node ast.Node) (any, error) {
 	return c.CallStmtHandler(node)
 }
 
-func (c *Compiler) RegisterStmtHandler(nodeType ast.NodeType, handler compileFunc) {
+func (c *Compiler) RegisterStmtHandler(nodeType ast.NodeType, handler iface.CompileFunc) {
 	c.handlers[nodeType] = handler
 }
 
@@ -125,15 +108,15 @@ func (c *Compiler) Emit(op bytecode.Opcode, operands ...int) int {
 	ins := bytecode.Make(op, operands...)
 	// 将指令添加到当前作用域的 instructions 中
 	currentScope := c.scopes[c.scopeIndex]
-	currentScope.instructions = append(currentScope.instructions, ins...)
-	return len(currentScope.instructions) - len(ins)
+	currentScope.Instructions = append(currentScope.Instructions, ins...)
+	return len(currentScope.Instructions) - len(ins)
 }
 
 // DefineLocal 在当前作用域定义局部变量
 func (c *Compiler) DefineLocal(name string) int {
 	currentScope := c.scopes[c.scopeIndex]
-	index := len(currentScope.symbolTable)
-	currentScope.symbolTable[name] = index
+	index := len(currentScope.SymbolTable)
+	currentScope.SymbolTable[name] = index
 	return index
 }
 
@@ -142,7 +125,7 @@ func (c *Compiler) ResolveVariable(name string) (isLocal bool, index int) {
 	// 从当前作用域开始，向上查找
 	for i := c.scopeIndex; i >= 0; i-- {
 		scope := c.scopes[i]
-		if idx, ok := scope.symbolTable[name]; ok {
+		if idx, ok := scope.SymbolTable[name]; ok {
 			// 如果在当前作用域或其父作用域中找到，则是局部变量
 			// 对于函数作用域，所有参数和局部变量都是局部的
 			return true, idx
@@ -154,19 +137,27 @@ func (c *Compiler) ResolveVariable(name string) (isLocal bool, index int) {
 }
 
 // CurrentScope 返回当前作用域
-func (c *Compiler) CurrentScope() *CompilationScope {
+func (c *Compiler) CurrentScope() *iface.CompilationScope {
 	if c.scopeIndex < 0 {
 		return nil
 	}
 	return c.scopes[c.scopeIndex]
 }
 
+func (c *Compiler) GetScopeIndex() int {
+	return c.scopeIndex
+}
+
 // ParentScope 返回当前作用域的父作用域
-func (c *Compiler) ParentScope() *CompilationScope {
+func (c *Compiler) ParentScope() *iface.CompilationScope {
 	if c.scopeIndex < 1 {
 		return nil
 	}
 	return c.scopes[c.scopeIndex-1]
+}
+
+func (c *Compiler) GetIndexScope(index int) *iface.CompilationScope {
+	return c.scopes[index]
 }
 
 func (c Compiler) Dismassemble() string {
@@ -175,9 +166,9 @@ func (c Compiler) Dismassemble() string {
 	mainScope := c.scopes[0]
 	// 遍历指令，每次读取一条完整的指令
 	ip := 0
-	for ip < len(mainScope.instructions) {
+	for ip < len(mainScope.Instructions) {
 		// 获取操作码定义
-		def, err := bytecode.Lookup(bytecode.Opcode(mainScope.instructions[ip]), c.constants)
+		def, err := bytecode.Lookup(bytecode.Opcode(mainScope.Instructions[ip]), c.constants)
 		if err != nil {
 			fmt.Fprintf(&out, "%04d ERROR: %s\n", ip, err.Error())
 			ip++
@@ -189,7 +180,7 @@ func (c Compiler) Dismassemble() string {
 			operandsWidth += w
 		}
 		// 读取操作数
-		operands, _ := bytecode.ReadOperands(mainScope.instructions[ip+1:ip+1+operandsWidth], 0)
+		operands, _ := bytecode.ReadOperands(mainScope.Instructions[ip+1:ip+1+operandsWidth], 0)
 		// 生成指令字符串
 		ins := bytecode.Make(def.Op, operands...)
 		fmt.Fprintf(&out, "%04d %s\n", ip, strings.Join(bytecode.Disassemble(ins, c.constants), " "))
@@ -199,12 +190,45 @@ func (c Compiler) Dismassemble() string {
 	return out.String()
 }
 
+// GetScopeEnv 获取作用域的环境
+func (c *Compiler) GetScopeEnv(scope *iface.CompilationScope) env.Environment {
+	return scope.Env
+}
+
+// GetScopeInstructions 获取作用域的指令
+func (c *Compiler) GetScopeInstructions(scope *iface.CompilationScope) bytecode.Instructions {
+	return scope.Instructions
+}
+
+// SetScopeInstructions 设置作用域的指令
+func (c *Compiler) SetScopeInstructions(scope *iface.CompilationScope, ins bytecode.Instructions) {
+	scope.Instructions = ins
+}
+
+// AppendScopeInstructions 追加指令到作用域
+func (c *Compiler) AppendScopeInstructions(scope *iface.CompilationScope, ins bytecode.Instructions) {
+	scope.Instructions = append(scope.Instructions, ins...)
+}
+
+// GetScopeConstantValues 获取作用域的常量值
+func (c *Compiler) GetScopeConstantValues(scope *iface.CompilationScope) map[int]any {
+	return scope.ConstantValues
+}
+
+// SetScopeConstantValue 设置作用域的常量值
+func (c *Compiler) SetScopeConstantValue(scope *iface.CompilationScope, index int, value any) {
+	if scope.ConstantValues == nil {
+		scope.ConstantValues = make(map[int]any)
+	}
+	scope.ConstantValues[index] = value
+}
+
 // 创建一个 CompiledFunction 对象
 func (c *Compiler) Bytecode() *bytecode.CompiledFunction {
 	// 返回主函数（第一个作用域）的指令
 	mainScope := c.scopes[0]
 	return &bytecode.CompiledFunction{
-		Instructions:  mainScope.instructions,
+		Instructions:  mainScope.Instructions,
 		NumLocals:     0,
 		NumParameters: 0,
 	}

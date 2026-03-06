@@ -12,9 +12,10 @@ import (
 	"vine-lang/parser"
 )
 
+var examplesDir = "example"
+
 // TestExamples 测试examples文件夹下的所有.vine文件
 func TestExamples(t *testing.T) {
-	examplesDir := "examples"
 
 	// 遍历examples文件夹
 	err := filepath.Walk(examplesDir, func(path string, info os.FileInfo, err error) error {
@@ -46,7 +47,6 @@ func TestExamples(t *testing.T) {
 
 // TestExamplesRecursive 递归测试examples文件夹下的所有.vine文件
 func TestExamplesRecursive(t *testing.T) {
-	examplesDir := "examples"
 
 	// 遍历examples文件夹及其子目录
 	err := filepath.Walk(examplesDir, func(path string, info os.FileInfo, err error) error {
@@ -98,7 +98,6 @@ func testVineFile(t *testing.T, filepath_ string) {
 
 // BenchmarkExamples 基准测试examples文件夹下的所有.vine文件
 func BenchmarkExamples(b *testing.B) {
-	examplesDir := "examples"
 
 	// 收集所有.vine文件
 	var files []string
