@@ -8,26 +8,8 @@ import (
 	"vine-lang/env"
 	"vine-lang/token"
 	iface "vine-lang/vm/interface"
+	"vine-lang/vm/vutils"
 )
-
-// isTruthy 判断值是否为真
-func isTruthy(value any) bool {
-	switch v := value.(type) {
-	case bool:
-		return v
-	case int64:
-		return v != 0
-	case float64:
-		return v != 0
-	case string:
-		return v != ""
-	case nil:
-		return false
-	default:
-		// 对于其他类型，假设为真
-		return true
-	}
-}
 
 type VM struct {
 	constants []any
@@ -364,7 +346,7 @@ func (v *VM) Run() (any, error) {
 			v.sp--
 			condition := v.stack[v.sp]
 			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if !isTruthy(condition) {
+			if !vutils.IsTruthy(condition) {
 				frame.Ip += offset
 			} else {
 				frame.Ip += 3
@@ -373,7 +355,7 @@ func (v *VM) Run() (any, error) {
 			v.sp--
 			condition := v.stack[v.sp]
 			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if isTruthy(condition) {
+			if vutils.IsTruthy(condition) {
 				frame.Ip += offset
 			} else {
 				frame.Ip += 3

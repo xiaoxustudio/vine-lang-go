@@ -1,124 +1,12 @@
 package vm
 
 import (
-	"reflect"
 	"vine-lang/bytecode"
 	"vine-lang/compiler"
 	"vine-lang/env"
 	"vine-lang/vm/handlers"
 	iface "vine-lang/vm/interface"
 )
-
-// compareValues 比较两个值，返回比较结果
-func compareValues(left, right any, operator string) bool {
-	// 快速路径：使用类型开关
-	switch left := left.(type) {
-	case int64:
-		switch right := right.(type) {
-		case int64:
-			switch operator {
-			case "==":
-				return left == right
-			case "!=":
-				return left != right
-			case "<":
-				return left < right
-			case "<=":
-				return left <= right
-			case ">":
-				return left > right
-			case ">=":
-				return left >= right
-			}
-		case float64:
-			leftFloat := float64(left)
-			switch operator {
-			case "==":
-				return leftFloat == right
-			case "!=":
-				return leftFloat != right
-			case "<":
-				return leftFloat < right
-			case "<=":
-				return leftFloat <= right
-			case ">":
-				return leftFloat > right
-			case ">=":
-				return leftFloat >= right
-			}
-		}
-	case float64:
-		switch right := right.(type) {
-		case int64:
-			rightFloat := float64(right)
-			switch operator {
-			case "==":
-				return left == rightFloat
-			case "!=":
-				return left != rightFloat
-			case "<":
-				return left < rightFloat
-			case "<=":
-				return left <= rightFloat
-			case ">":
-				return left > rightFloat
-			case ">=":
-				return left >= rightFloat
-			}
-		case float64:
-			switch operator {
-			case "==":
-				return left == right
-			case "!=":
-				return left != right
-			case "<":
-				return left < right
-			case "<=":
-				return left <= right
-			case ">":
-				return left > right
-			case ">=":
-				return left >= right
-			}
-		}
-	case string:
-		if right, ok := right.(string); ok {
-			switch operator {
-			case "==":
-				return left == right
-			case "!=":
-				return left != right
-			case "<":
-				return left < right
-			case "<=":
-				return left <= right
-			case ">":
-				return left > right
-			case ">=":
-				return left >= right
-			}
-		}
-	case bool:
-		if right, ok := right.(bool); ok {
-			switch operator {
-			case "==":
-				return left == right
-			case "!=":
-				return left != right
-			}
-		}
-	}
-
-	// 使用 reflect 进行通用比较
-	switch operator {
-	case "==":
-		return reflect.DeepEqual(left, right)
-	case "!=":
-		return !reflect.DeepEqual(left, right)
-	default:
-		return false
-	}
-}
 
 func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	v := &VM{
