@@ -39,7 +39,7 @@ func HandleMemberExpr(c iface.CompilerInterface, node ast.Node) (any, error) {
 		}
 		c.Emit(bytecode.OpIndex)
 	} else {
-		// 处理非计算属性
+		// 处理非计算属性 xxx,xxx
 		if literal, ok := n.Property.(*ast.Literal); ok {
 			// 处理字面量属性（包括标识符、数字、字符串）
 			var propName string

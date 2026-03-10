@@ -16,7 +16,7 @@ type CompilerInterface interface {
 	AddConstant(constant any) int
 	// DefineLocal 定义局部变量
 	DefineLocal(name string) int
-	// ResolveVariable 解析变量
+	// ResolveVariable 解析变量，返回变量的类型（全局或局部）和索引
 	ResolveVariable(name string) (isLocal bool, index int)
 	// CurrentScope 获取当前作用域
 	CurrentScope() *CompilationScope

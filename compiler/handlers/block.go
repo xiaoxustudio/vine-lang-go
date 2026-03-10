@@ -9,10 +9,10 @@ import (
 func HandleBlockStmt(c iface.CompilerInterface, node ast.Node) (any, error) {
 	n := node.(*ast.BlockStmt)
 
-	// 进入新的作用域
 	// 使用当前作用域的环境
 	currentScope := c.CurrentScope()
 	currentEnv := c.GetScopeEnv(currentScope)
+	// 进入新的作用域
 	c.EnterScope(currentEnv)
 
 	for _, s := range n.Body {

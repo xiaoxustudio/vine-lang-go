@@ -18,6 +18,9 @@ func HandleUnaryExpr(c iface.CompilerInterface, node ast.Node) (any, error) {
 			return nil, err
 		}
 
+		// 复制当前值作为返回值（后缀操作返回操作前的值）
+		c.Emit(bytecode.OpDup)
+
 		// 发出自增或自减指令
 		switch n.Operator.Type {
 		case token.INC:
@@ -42,6 +45,8 @@ func HandleUnaryExpr(c iface.CompilerInterface, node ast.Node) (any, error) {
 				c.Emit(bytecode.OpSetGlobal, pos)
 			}
 		}
+		// 弹出保存后的值，保留复制的原始值
+		c.Emit(bytecode.OpPop)
 		return nil, nil
 	}
 

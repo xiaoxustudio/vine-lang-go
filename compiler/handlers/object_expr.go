@@ -14,6 +14,7 @@ func HandleObjectExpr(c iface.CompilerInterface, node ast.Node) (any, error) {
 		// 编译键
 		if prop.Key.Value.Type == token.IDENT {
 			// 标识符键，直接压入字符串
+			// 如果不处理会尝试解析为标识符（同理它会进行获取变量的操作），这是不合理的
 			keyName := prop.Key.Value.Value
 			pos := c.AddConstant(keyName)
 			c.Emit(bytecode.OpConstant, pos)
