@@ -50,10 +50,13 @@ const (
 	OpGetMember
 	OpSetMember // 设置成员
 	OpExpose    // 导出变量
+	OpCallTask  // 调用任务
 
 	/* 结构 */
 	OpArray
 	OpObject
+	OpTask
+	OpTo
 )
 
 type Instructions []byte // 单个指令

@@ -1,0 +1,37 @@
+use glb pick print
+
+task fn a:
+    print("执行函数a")
+end
+
+
+task fn b(res):
+    print("b函数被执行",res)
+end
+
+task fn c:
+    print("c函数被执行")
+    return 1
+end
+
+task fn call:
+    print("call函数被执行")
+    return 123
+end
+
+# b(123)
+# print("开始执行脚本")
+# a()
+# c()
+
+call()
+    to (res):
+        print("call函数的执行结果：", res)
+        res
+    to (num):
+        num + 2
+    to (num):
+        print("最后的运行",num)
+end
+
+print(12366)

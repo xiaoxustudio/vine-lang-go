@@ -280,6 +280,7 @@ func (p *Parser) parseArgs() *ast.ArgsExpr {
 		return nil
 	}
 	var node = ast.NewArgsExpr([]ast.Expr{})
+
 	for !p.isEof() && p.peek().Type != token.RPAREN {
 		expr := p.parseExpression()
 		if expr == nil {
@@ -312,11 +313,12 @@ func (p *Parser) parseCallExpression() ast.Expr {
 		var parentToStmt = ast.NewToExpr(*ast.NewBlockStmt([]ast.Stmt{}), *ast.NewArgsExpr([]ast.Expr{}), nil)
 		var currentToStmt = parentToStmt
 		if p.peek().Type == token.TO {
-			for p.peek().Type == token.TO || p.peek().Type != token.CATCH {
+			for p.peek().Type == token.TO {
 				p.advance()
 				toStmt := ast.NewToExpr(*ast.NewBlockStmt([]ast.Stmt{}), *ast.NewArgsExpr([]ast.Expr{}), nil)
 				if p.peek().Type == token.LPAREN {
 					p.advance()
+
 					args := p.parseArgs()
 					p.expect(token.RPAREN)
 					toStmt.Args = *args
@@ -335,6 +337,7 @@ func (p *Parser) parseCallExpression() ast.Expr {
 					currentToStmt = toStmt
 				}
 			}
+
 			var catchStmt *ast.LambdaFunctionDecl
 			if p.peek().Type == token.CATCH {
 				p.advance()

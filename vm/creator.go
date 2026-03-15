@@ -66,6 +66,9 @@ func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	v.RegisterOpenCodeHandler(bytecode.OpExpose, handlers.HandleExpose)
 	v.RegisterOpenCodeHandler(bytecode.OpArray, handlers.HandleArray)
 	v.RegisterOpenCodeHandler(bytecode.OpObject, handlers.HandleObject)
+	v.RegisterOpenCodeHandler(bytecode.OpTask, handlers.HandleTask)
+	v.RegisterOpenCodeHandler(bytecode.OpCallTask, handlers.HandleCallTask)
+	v.RegisterOpenCodeHandler(bytecode.OpTo, handlers.HandleTo)
 
 	return v
 }

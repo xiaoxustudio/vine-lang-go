@@ -71,7 +71,8 @@ func HandleGetGlobal(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instr
 	frame := v.CurrentFrame()
 	constants := v.GetConstants()
 
-	globalIndex := int(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
+	// 使用当前帧的指令指针来读取操作数
+	globalIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
 	if globalIndex >= len(constants) {
 		return nil, fmt.Errorf("global index %d out of range", globalIndex)
 	}

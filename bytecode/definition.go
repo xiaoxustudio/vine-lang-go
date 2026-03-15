@@ -29,6 +29,7 @@ var definitions = map[Opcode]*Definition{
 	OpGetLocal:     {"OpGetLocal", []int{2}, OpGetLocal},
 	OpSetLocal:     {"OpSetLocal", []int{2}, OpSetLocal},
 	OpCall:         {"OpCall", []int{2}, OpCall},
+	OpCallTask:     {"OpCallTask", []int{2}, OpCallTask},
 	OpReturn:       {"OpReturn", nil, OpReturn},
 	OpIndex:        {"OpIndex", nil, OpIndex},
 	OpSetIndex:     {"OpSetIndex", nil, OpSetIndex},
@@ -45,6 +46,8 @@ var definitions = map[Opcode]*Definition{
 	OpGreaterEqual: {"OpGreaterEqual", nil, OpGreaterEqual},
 	OpArray:        {"OpArray", []int{2}, OpArray},
 	OpObject:       {"OpObject", []int{2}, OpObject},
+	OpTask:         {"OpTask", []int{2}, OpTask},
+	OpTo:           {"OpTo", nil, OpTo},
 }
 
 func Lookup(op Opcode, constants []any) (*Definition, error) {

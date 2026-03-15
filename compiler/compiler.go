@@ -83,13 +83,13 @@ func (c *Compiler) CallStmtHandler(node ast.Node) (any, error) {
 // 添加常量，并返回常量的位置
 func (c *Compiler) AddConstant(constant any) int {
 	// 检查常量是否已经存在于常量池中
-	for i, c := range c.constants {
+	for i, existing := range c.constants {
 		// 对于字符串类型，使用字符串比较
 		if str, ok := constant.(string); ok {
-			if existingStr, ok := c.(string); ok && existingStr == str {
+			if existingStr, ok := existing.(string); ok && existingStr == str {
 				return i
 			}
-		} else if reflect.DeepEqual(c, constant) {
+		} else if reflect.DeepEqual(existing, constant) {
 			return i
 		}
 	}
@@ -178,6 +178,12 @@ func (c Compiler) Dismassemble() string {
 		operandsWidth := 0
 		for _, w := range def.OperandWidths {
 			operandsWidth += w
+		}
+		// 检查是否有足够的字节来读取操作数
+		if ip+1+operandsWidth > len(mainScope.Instructions) {
+			fmt.Fprintf(&out, "%04d ERROR: insufficient operands\n", ip)
+			ip++
+			continue
 		}
 		// 读取操作数
 		operands, _ := bytecode.ReadOperands(mainScope.Instructions[ip+1:ip+1+operandsWidth], 0)

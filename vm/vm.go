@@ -1,14 +1,12 @@
 package vm
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"vine-lang/bytecode"
 	"vine-lang/env"
 	"vine-lang/token"
 	iface "vine-lang/vm/interface"
-	"vine-lang/vm/vutils"
 )
 
 type VM struct {
@@ -125,272 +123,31 @@ func (v *VM) Run() (any, error) {
 		frame := v.frames[v.frameIndex]
 		// 检查是否超出指令范围
 		if frame.Ip >= len(frame.Fn.Instructions) {
+			// 函数执行完毕，触发返回处理
+			// 只有当不是主帧时才触发返回处理
+			if v.frameIndex > 0 {
+				handler := v.handlers[bytecode.OpReturn]
+				if handler != nil {
+					r, err := handler(v, bytecode.OpReturn, frame.Fn.Instructions)
+					if err != nil {
+						return nil, err
+					}
+					result = r
+					continue
+				}
+			}
 			break
 		}
 		opcode := bytecode.Opcode(frame.Fn.Instructions[frame.Ip])
-
-		switch opcode {
-		case bytecode.OpConstant:
-			constIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if constIndex >= len(v.constants) {
-				return nil, fmt.Errorf("constant index %d out of range", constIndex)
-			}
-			constant := v.constants[constIndex]
-			v.stack[v.sp] = constant
-			v.sp++
-			frame.Ip += 3
-			result = constant
-		case bytecode.OpGetLocal:
-			localIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if localIndex >= len(v.locals) {
-				return nil, fmt.Errorf("local index %d out of range", localIndex)
-			}
-			value := v.locals[localIndex]
-			v.stack[v.sp] = value
-			v.sp++
-			frame.Ip += 3
-			result = value
-		case bytecode.OpSetLocal:
-			localIndex := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if localIndex >= len(v.locals) {
-				return nil, fmt.Errorf("local index %d out of range", localIndex)
-			}
-			v.sp--
-			v.locals[localIndex] = v.stack[v.sp]
-			frame.Ip += 3
-		case bytecode.OpPlus, bytecode.OpMinus, bytecode.OpMul, bytecode.OpDiv:
-			v.sp -= 2
-			right := v.stack[v.sp+1]
-			left := v.stack[v.sp]
-			var calcResult any
-			var err error
-
-			switch opcode {
-			case bytecode.OpPlus:
-				switch left := left.(type) {
-				case int64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left + right
-					case float64:
-						calcResult = float64(left) + right
-					default:
-						err = errors.New("unsupported types for addition")
-					}
-				case float64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left + float64(right)
-					case float64:
-						calcResult = left + right
-					default:
-						err = errors.New("unsupported types for addition")
-					}
-				default:
-					err = errors.New("unsupported types for addition")
-				}
-			case bytecode.OpMinus:
-				switch left := left.(type) {
-				case int64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left - right
-					case float64:
-						calcResult = float64(left) - right
-					default:
-						err = errors.New("unsupported types for subtraction")
-					}
-				case float64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left - float64(right)
-					case float64:
-						calcResult = left - right
-					default:
-						err = errors.New("unsupported types for subtraction")
-					}
-				default:
-					err = errors.New("unsupported types for subtraction")
-				}
-			case bytecode.OpMul:
-				switch left := left.(type) {
-				case int64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left * right
-					case float64:
-						calcResult = float64(left) * right
-					default:
-						err = errors.New("unsupported types for multiplication")
-					}
-				case float64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left * float64(right)
-					case float64:
-						calcResult = left * right
-					default:
-						err = errors.New("unsupported types for multiplication")
-					}
-				default:
-					err = errors.New("unsupported types for multiplication")
-				}
-			default: // OpDiv
-				switch right := right.(type) {
-				case int64:
-					if right == 0 {
-						return nil, errors.New("division by zero")
-					}
-				case float64:
-					if right == 0 {
-						return nil, errors.New("division by zero")
-					}
-				}
-				switch left := left.(type) {
-				case int64:
-					switch right := right.(type) {
-					case int64:
-						if left%right == 0 {
-							calcResult = left / right
-						} else {
-							calcResult = float64(left) / float64(right)
-						}
-					case float64:
-						calcResult = float64(left) / right
-					default:
-						err = errors.New("unsupported types for division")
-					}
-				case float64:
-					switch right := right.(type) {
-					case int64:
-						calcResult = left / float64(right)
-					case float64:
-						calcResult = left / right
-					default:
-						err = errors.New("unsupported types for division")
-					}
-				default:
-					err = errors.New("unsupported types for division")
-				}
-			}
-
-			if err != nil {
-				return nil, err
-			}
-			v.stack[v.sp] = calcResult
-			v.sp++
-			frame.Ip += 1
-			result = calcResult
-		case bytecode.OpLessThan:
-			v.sp -= 2
-			right := v.stack[v.sp+1]
-			left := v.stack[v.sp]
-			var cmpResult bool
-
-			switch left := left.(type) {
-			case int64:
-				switch right := right.(type) {
-				case int64:
-					cmpResult = left < right
-				case float64:
-					cmpResult = float64(left) < right
-				}
-			case float64:
-				switch right := right.(type) {
-				case int64:
-					cmpResult = left < float64(right)
-				case float64:
-					cmpResult = left < right
-				}
-			}
-
-			v.stack[v.sp] = cmpResult
-			v.sp++
-			frame.Ip += 1
-			result = cmpResult
-		case bytecode.OpEqual:
-			// 弹出栈顶两个值进行比较
-			v.sp -= 2
-			right := v.stack[v.sp+1]
-			left := v.stack[v.sp]
-			var cmpResult bool
-
-			// 比较两个值
-			switch left := left.(type) {
-			case int64:
-				switch right := right.(type) {
-				case int64:
-					cmpResult = left == right
-				case float64:
-					cmpResult = float64(left) == right
-				}
-			case float64:
-				switch right := right.(type) {
-				case int64:
-					cmpResult = left == float64(right)
-				case float64:
-					cmpResult = left == right
-				}
-			case string:
-				if right, ok := right.(string); ok {
-					cmpResult = left == right
-				}
-			}
-
-			// 将比较结果压入栈顶
-			v.stack[v.sp] = cmpResult
-			v.sp++
-			frame.Ip += 1
-			result = cmpResult
-		case bytecode.OpJumpIfFalse:
-			v.sp--
-			condition := v.stack[v.sp]
-			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if !vutils.IsTruthy(condition) {
-				frame.Ip += offset
-			} else {
-				frame.Ip += 3
-			}
-		case bytecode.OpJumpIfTrue:
-			v.sp--
-			condition := v.stack[v.sp]
-			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			if vutils.IsTruthy(condition) {
-				frame.Ip += offset
-			} else {
-				frame.Ip += 3
-			}
-		case bytecode.OpJump:
-			offset := int(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			frame.Ip += offset
-		case bytecode.OpLoop:
-			offset := int16(binary.LittleEndian.Uint16(frame.Fn.Instructions[frame.Ip+1:]))
-			frame.Ip += int(offset)
-		case bytecode.OpIncrement:
-			v.sp--
-			val := v.stack[v.sp]
-			switch val := val.(type) {
-			case int64:
-				v.stack[v.sp] = val + 1
-			case float64:
-				v.stack[v.sp] = val + 1
-			}
-			v.sp++
-			frame.Ip += 1
-		case bytecode.OpPop:
-			v.sp--
-			frame.Ip += 1
-		default:
-			handler := v.handlers[opcode]
-			if handler == nil {
-				return nil, errors.New("unknown opcode")
-			}
-			r, err := handler(v, opcode, frame.Fn.Instructions)
-			if err != nil {
-				return nil, err
-			}
-			result = r
+		handler := v.handlers[opcode]
+		if handler == nil {
+			return nil, fmt.Errorf("unknown opcode %d", opcode)
 		}
+		r, err := handler(v, opcode, frame.Fn.Instructions)
+		if err != nil {
+			return nil, err
+		}
+		result = r
 	}
 	return result, nil
 }

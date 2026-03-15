@@ -56,6 +56,7 @@ type Frame struct {
 	Fn          *bytecode.CompiledFunction
 	Ip          int // instruction pointer
 	BasePointer int // 栈基址，用于局部变量
+	ToCount     int // to表达式数量
 }
 
 // VMFunc 虚拟机处理函数

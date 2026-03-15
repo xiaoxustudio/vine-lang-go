@@ -6,7 +6,6 @@ import (
 	"vine-lang/ast"
 	"vine-lang/lexer"
 	"vine-lang/token"
-	"vine-lang/verror"
 )
 
 func CreateParser(lex *lexer.Lexer) *Parser {
@@ -224,10 +223,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 				return ast.NewTaskStmt(*f)
 			}
 		}
-		panic(verror.ParseVError{
-			Position: p.peek().ToPosition(""),
-			Message:  "expected function declaration",
-		})
+		return fn
 	})
 
 	c.RegisterStmtHandler(token.WAIT, func(p *Parser) any {

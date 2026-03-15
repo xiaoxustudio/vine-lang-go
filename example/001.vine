@@ -1,11 +1,11 @@
 use glb pick print
-use "./module.vine"
-use "./module.vine" as module
-use time
 
 
-print(module.STATE.a)
-print(STATE.a)
-print(time.Milli())
+task fn call():
+    print("call函数被执行")
+    return 123
+end
 
-print(++1,1++)
+call() to ():
+    print("hello world")
+end

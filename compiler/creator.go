@@ -37,12 +37,20 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return handlers.HandleVariableDeclStmt(c, node)
 	})
 
+	c.RegisterStmtHandler(ast.NodeTypeTaskStmt, func(node ast.Node) (any, error) {
+		return handlers.HandleTaskStmt(c, node)
+	})
+
 	c.RegisterStmtHandler(ast.NodeTypeFunctionDecl, func(node ast.Node) (any, error) {
 		return handlers.HandleFunctionDeclStmt(c, node)
 	})
 
 	c.RegisterStmtHandler(ast.NodeTypeLambdaFunctionDecl, func(node ast.Node) (any, error) {
 		return handlers.HandleLambdaFunctionDeclStmt(c, node)
+	})
+
+	c.RegisterStmtHandler(ast.NodeTypeCallTaskFn, func(node ast.Node) (any, error) {
+		return handlers.HandleCallTaskStmt(c, node)
 	})
 
 	c.RegisterStmtHandler(ast.NodeTypeReturnStmt, func(node ast.Node) (any, error) {
@@ -92,6 +100,10 @@ func NewCompiler(e *env.Environment) *Compiler {
 		return handlers.HandleSwitchStmt(c, node)
 	})
 
+	c.RegisterStmtHandler(ast.NodeTypeToExpr, func(node ast.Node) (any, error) {
+		return handlers.HandleToExpr(c, node)
+	})
+
 	c.RegisterStmtHandler(ast.NodeTypeAssignmentExpr, func(node ast.Node) (any, error) {
 		return handlers.HandleAssignmentExpr(c, node)
 	})
@@ -112,19 +124,7 @@ func NewCompiler(e *env.Environment) *Compiler {
 	})
 
 	c.RegisterStmtHandler(ast.NodeTypeCallExpr, func(node ast.Node) (any, error) {
-		n := node.(*ast.CallExpr)
-		_, err := c.Compile(n.Callee)
-		if err != nil {
-			return nil, err
-		}
-
-		_, err = c.Compile(&n.Args)
-		if err != nil {
-			return nil, err
-		}
-
-		c.Emit(bytecode.OpCall, len(n.Args.Arguments))
-		return nil, nil
+		return handlers.HandleCallStmt(c, node)
 	})
 
 	c.RegisterStmtHandler(ast.NodeTypeMemberExpr, func(node ast.Node) (any, error) {

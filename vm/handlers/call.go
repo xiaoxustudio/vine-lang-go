@@ -112,10 +112,91 @@ func HandleReturn(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instruct
 
 	// 弹出当前帧
 	frameIndex := v.GetFrameIndex()
-	v.SetFrameIndex(frameIndex - 1)
 	if frameIndex-1 < 0 {
 		// 返回到主函数
 		return returnValue, nil
+	}
+
+	// 获取上一个帧
+	prevFrame := v.GetFrames()[frameIndex-1]
+	// 保存原始帧索引，用于后续更新prevFrame.ToCount
+	originalFrameIndex := frameIndex
+	v.SetFrameIndex(frameIndex - 1)
+
+	// 检查是否有to表达式需要调用
+	if frame.ToCount > 0 {
+		// 栈结构: [..., to1, to2, ...]
+		// 我们需要从栈中弹出to表达式，并调用它们
+		// 首先将返回值压入栈，作为to表达式的参数
+		if returnValue != nil {
+			v.Push(returnValue)
+		}
+
+		// 获取当前的栈指针
+		sp := v.GetSP()
+
+		// 计算to表达式在栈中的起始位置
+		// 在HandleCallTask中，to表达式被压入栈中，位置在任务对象之后
+		// 所以to表达式的起始位置是 prevFrame.BasePointer
+		toStart := prevFrame.BasePointer
+
+		// 计算当前应该调用的to表达式索引
+		currentToIndex := prevFrame.ToCount - frame.ToCount
+
+		if currentToIndex >= 0 && toStart+currentToIndex < sp {
+			// 从栈中获取当前to表达式
+			toFn := v.GetStack()[toStart+currentToIndex]
+			if compiledFn, ok := toFn.(*bytecode.CompiledFunction); ok {
+				// 调用to表达式
+				// 栈结构: [..., to1, to2, ..., 返回值]
+				// 我们需要将返回值作为参数传递给to表达式
+				returnValue := v.Pop()
+				v.Push(returnValue) // 将返回值压入栈，作为to表达式的参数
+
+				// 创建新帧来执行to表达式
+				newFrame := &iface.Frame{
+					Fn:          compiledFn,
+					Ip:          0,
+					BasePointer: v.GetSP() - 1,     // 返回值在栈顶
+					ToCount:     frame.ToCount - 1, // 剩余的to表达式数量
+				}
+
+				// 将返回值复制到locals数组中
+				locals := v.GetLocals()
+				locals[0] = returnValue
+				v.SetLocals(locals)
+
+				// 将剩余的to表达式保存到栈中
+				// 注意：我们需要按照正确的顺序保存to表达式
+				// to表达式在栈中的顺序是to1, to2, to3，我们已经调用了to3，所以需要保存to1, to2
+				// 但是，我们不应该保存已经执行过的to表达式
+				// 所以我们需要从栈中移除已执行的to表达式
+				// 这可以通过调整toStart来实现
+				newToStart := toStart + currentToIndex + 1
+				if newToStart < sp {
+					// 将剩余的to表达式保存到栈中
+					for j := newToStart; j < sp; j++ {
+						toFn := v.GetStack()[j]
+						v.Push(toFn)
+					}
+				}
+
+				// 更新prevFrame的BasePointer，以便在下一次返回时正确地访问栈
+				prevFrame.BasePointer = v.GetSP()
+				// 更新prevFrame的ToCount，以便在下一次返回时正确计算currentToIndex
+				frames := v.GetFrames()
+				frames[originalFrameIndex-1].ToCount = frame.ToCount - 1
+				frames[originalFrameIndex-1].BasePointer = v.GetSP()
+
+				frames = append(frames, newFrame)
+				v.SetFrames(frames)
+				v.SetFrameIndex(len(frames) - 1) // 设置为新帧的索引
+				// 不重置栈指针，保持当前状态
+				// 只调用当前to表达式，其他的会在下一次返回时调用
+				return returnValue, nil
+			}
+		}
+		// 所有to表达式都已执行完毕，继续正常返回流程
 	}
 
 	v.SetSP(frame.BasePointer)
