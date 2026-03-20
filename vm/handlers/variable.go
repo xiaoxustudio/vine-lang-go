@@ -95,35 +95,19 @@ func HandleGetGlobal(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instr
 // HandleGetLocal 处理获取局部变量
 func HandleGetLocal(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
-	locals := v.GetLocals()
-
-	localIndex := int(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
-	// 从locals数组中获取局部变量
-	if localIndex >= len(locals) {
-		return nil, fmt.Errorf("local index %d out of range", localIndex)
-	}
-	value := locals[localIndex]
-	// 压入栈
-	v.Push(value)
-	frame.Ip += 3
+	ip := frame.Ip
+	localIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+	value := v.LoadLocalToStack(localIndex)
+	frame.Ip = ip + 3
 	return value, nil
 }
 
 // HandleSetLocal 处理设置局部变量
 func HandleSetLocal(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
-	locals := v.GetLocals()
-
-	localIndex := int(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
-	// 从栈中弹出值
-	value := v.Pop()
-	// 设置局部变量
-	if localIndex >= len(locals) {
-		return nil, fmt.Errorf("local index %d out of range", localIndex)
-	}
-	locals[localIndex] = value
-	// 使用SetLocals方法设置局部变量
-	v.SetLocals(locals)
-	frame.Ip += 3
+	ip := frame.Ip
+	localIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+	value := v.StoreLocalFromStack(localIndex)
+	frame.Ip = ip + 3
 	return value, nil
 }

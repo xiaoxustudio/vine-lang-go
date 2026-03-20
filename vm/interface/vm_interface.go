@@ -39,6 +39,10 @@ type VMInterface interface {
 	GetLocals() []any
 	// SetLocals 设置局部变量
 	SetLocals(locals []any)
+	// LoadLocalToStack 从局部变量加载到栈
+	LoadLocalToStack(index int) any
+	// StoreLocalFromStack 从栈存储到局部变量
+	StoreLocalFromStack(index int) any
 	// GetEnv 获取环境
 	GetEnv() *env.Environment
 	// GetEnvVar 从环境获取变量

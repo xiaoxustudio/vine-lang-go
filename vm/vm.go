@@ -10,18 +10,30 @@ import (
 	"vine-lang/vm/types"
 )
 
+const (
+	valueKindAny  uint8 = 0
+	valueKindInt  uint8 = 1
+	valueKindBool uint8 = 2
+)
+
 type VM struct {
 	constants []any
 	stack     []any
+	stackMeta []uint8
+	stackInt  []int64
+	stackBool []bool
 	sp        int // stack pointer
 
 	frames     []*iface.Frame // 函数调用栈
 	frameIndex int
 
-	globals  []any             // 全局变量
-	locals   []any             // 局部变量
-	handlers [256]iface.VMFunc // 使用数组代替map，避免哈希查找开销
-	env      *env.Environment  // 环境引用
+	globals   []any // 全局变量
+	locals    []any // 局部变量
+	localMeta []uint8
+	localInt  []int64
+	localBool []bool
+	handlers  [256]iface.VMFunc // 使用数组代替map，避免哈希查找开销
+	env       *env.Environment  // 环境引用
 
 	// 异步任务队列
 	asyncTasks []*types.AsyncTask
@@ -88,6 +100,51 @@ func (v *VM) GetLocals() []any {
 // SetLocals 设置局部变量
 func (v *VM) SetLocals(locals []any) {
 	v.locals = locals
+	v.rebuildLocalMeta()
+}
+
+func (v *VM) LoadLocalToStack(index int) any {
+	switch v.localMeta[index] {
+	case valueKindInt:
+		val := v.localInt[index]
+		v.stackMeta[v.sp] = valueKindInt
+		v.stackInt[v.sp] = val
+		v.sp++
+		return val
+	case valueKindBool:
+		val := v.localBool[index]
+		v.stackMeta[v.sp] = valueKindBool
+		v.stackBool[v.sp] = val
+		v.sp++
+		return val
+	default:
+		value := v.locals[index]
+		v.stackMeta[v.sp] = valueKindAny
+		v.stack[v.sp] = value
+		v.sp++
+		return value
+	}
+}
+
+func (v *VM) StoreLocalFromStack(index int) any {
+	v.sp--
+	switch v.stackMeta[v.sp] {
+	case valueKindInt:
+		val := v.stackInt[v.sp]
+		v.localMeta[index] = valueKindInt
+		v.localInt[index] = val
+		return val
+	case valueKindBool:
+		val := v.stackBool[v.sp]
+		v.localMeta[index] = valueKindBool
+		v.localBool[index] = val
+		return val
+	default:
+		value := v.stack[v.sp]
+		v.localMeta[index] = valueKindAny
+		v.locals[index] = value
+		return value
+	}
 }
 
 // GetEnv 获取环境
@@ -133,6 +190,16 @@ func (v *VM) AddAsyncTask(fn *bytecode.CompiledFunction, toFunctions []*bytecode
 
 func (v *VM) Run() (any, error) {
 	var result any
+	stack := v.stack
+	stackMeta := v.stackMeta
+	stackInt := v.stackInt
+	stackBool := v.stackBool
+	locals := v.locals
+	localMeta := v.localMeta
+	localInt := v.localInt
+	localBool := v.localBool
+	constants := v.constants
+	sp := v.sp
 	for v.frameIndex >= 0 {
 		frame := v.frames[v.frameIndex]
 		// 检查是否超出指令范围
@@ -140,6 +207,8 @@ func (v *VM) Run() (any, error) {
 			// 函数执行完毕，触发返回处理
 			// 只有当不是主帧时才触发返回处理
 			if v.frameIndex > 0 {
+				v.materializeFastState(sp)
+				v.sp = sp
 				handler := v.handlers[bytecode.OpReturn]
 				if handler != nil {
 					r, err := handler(v, bytecode.OpReturn, frame.Fn.Instructions)
@@ -147,24 +216,222 @@ func (v *VM) Run() (any, error) {
 						return nil, err
 					}
 					result = r
+					stack = v.stack
+					stackMeta = v.stackMeta
+					stackInt = v.stackInt
+					stackBool = v.stackBool
+					locals = v.locals
+					localMeta = v.localMeta
+					localInt = v.localInt
+					localBool = v.localBool
+					constants = v.constants
+					sp = v.sp
+					v.rebuildFastState(sp)
 					continue
 				}
 			}
 			break
 		}
-		opcode := bytecode.Opcode(frame.Fn.Instructions[frame.Ip])
+		ins := frame.Fn.Instructions
+		ip := frame.Ip
+		opcode := bytecode.Opcode(ins[ip])
+		switch opcode {
+		case bytecode.OpConstant:
+			constIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+			constant := constants[constIndex]
+			if intVal, ok := constant.(int64); ok {
+				stackMeta[sp] = valueKindInt
+				stackInt[sp] = intVal
+			} else if boolVal, ok := constant.(bool); ok {
+				stackMeta[sp] = valueKindBool
+				stackBool[sp] = boolVal
+			} else {
+				stackMeta[sp] = valueKindAny
+				stack[sp] = constant
+			}
+			sp++
+			frame.Ip = ip + 3
+			continue
+		case bytecode.OpGetLocal:
+			localIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+			switch localMeta[localIndex] {
+			case valueKindInt:
+				stackMeta[sp] = valueKindInt
+				stackInt[sp] = localInt[localIndex]
+			case valueKindBool:
+				stackMeta[sp] = valueKindBool
+				stackBool[sp] = localBool[localIndex]
+			default:
+				stackMeta[sp] = valueKindAny
+				stack[sp] = locals[localIndex]
+			}
+			sp++
+			frame.Ip = ip + 3
+			continue
+		case bytecode.OpSetLocal:
+			localIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+			sp--
+			switch stackMeta[sp] {
+			case valueKindInt:
+				localMeta[localIndex] = valueKindInt
+				localInt[localIndex] = stackInt[sp]
+			case valueKindBool:
+				localMeta[localIndex] = valueKindBool
+				localBool[localIndex] = stackBool[sp]
+			default:
+				localMeta[localIndex] = valueKindAny
+				locals[localIndex] = stack[sp]
+			}
+			frame.Ip = ip + 3
+			continue
+		case bytecode.OpPop:
+			sp--
+			frame.Ip = ip + 1
+			continue
+		case bytecode.OpDup:
+			if sp > 0 {
+				stackMeta[sp] = stackMeta[sp-1]
+				switch stackMeta[sp-1] {
+				case valueKindInt:
+					stackInt[sp] = stackInt[sp-1]
+				case valueKindBool:
+					stackBool[sp] = stackBool[sp-1]
+				default:
+					stack[sp] = stack[sp-1]
+				}
+				sp++
+			}
+			frame.Ip = ip + 1
+			continue
+		case bytecode.OpJump:
+			offset := int(ins[ip+1]) | int(ins[ip+2])<<8
+			frame.Ip += offset
+			continue
+		case bytecode.OpLoop:
+			offset := int(int16(uint16(ins[ip+1]) | uint16(ins[ip+2])<<8))
+			frame.Ip += offset
+			continue
+		case bytecode.OpJumpIfFalse:
+			sp--
+			offset := int(ins[ip+1]) | int(ins[ip+2])<<8
+			isTruthy := true
+			switch stackMeta[sp] {
+			case valueKindInt:
+				isTruthy = stackInt[sp] != 0
+			case valueKindBool:
+				isTruthy = stackBool[sp]
+			default:
+				isTruthy = vmIsTruthy(stack[sp])
+			}
+			if !isTruthy {
+				frame.Ip += offset
+			} else {
+				frame.Ip = ip + 3
+			}
+			continue
+		case bytecode.OpIncrement:
+			top := sp - 1
+			if stackMeta[top] == valueKindInt {
+				stackInt[top] = stackInt[top] + 1
+				frame.Ip = ip + 1
+				continue
+			}
+		case bytecode.OpDecrement:
+			top := sp - 1
+			if stackMeta[top] == valueKindInt {
+				stackInt[top] = stackInt[top] - 1
+				frame.Ip = ip + 1
+				continue
+			}
+		case bytecode.OpMinus:
+			rightIndex := sp - 1
+			leftIndex := sp - 2
+			if stackMeta[leftIndex] == valueKindInt && stackMeta[rightIndex] == valueKindInt {
+				stackInt[leftIndex] = stackInt[leftIndex] - stackInt[rightIndex]
+				stackMeta[leftIndex] = valueKindInt
+				sp--
+				frame.Ip = ip + 1
+				continue
+			}
+		case bytecode.OpDiv:
+			rightIndex := sp - 1
+			leftIndex := sp - 2
+			if stackMeta[leftIndex] == valueKindInt && stackMeta[rightIndex] == valueKindInt {
+				leftVal := stackInt[leftIndex]
+				rightVal := stackInt[rightIndex]
+				if rightVal == 0 {
+					return nil, errors.New("division by zero")
+				}
+				if leftVal%rightVal == 0 {
+					stackInt[leftIndex] = leftVal / rightVal
+					stackMeta[leftIndex] = valueKindInt
+				} else {
+					stack[leftIndex] = float64(leftVal) / float64(rightVal)
+					stackMeta[leftIndex] = valueKindAny
+				}
+				sp--
+				frame.Ip = ip + 1
+				continue
+			}
+		case bytecode.OpLessThan:
+			rightIndex := sp - 1
+			leftIndex := sp - 2
+			if stackMeta[leftIndex] == valueKindInt && stackMeta[rightIndex] == valueKindInt {
+				resultVal := stackInt[leftIndex] < stackInt[rightIndex]
+				stackMeta[leftIndex] = valueKindBool
+				stackBool[leftIndex] = resultVal
+				sp--
+				frame.Ip = ip + 1
+				continue
+			}
+		case bytecode.OpPlus:
+			rightIndex := sp - 1
+			leftIndex := sp - 2
+			if stackMeta[leftIndex] == valueKindInt && stackMeta[rightIndex] == valueKindInt {
+				stackInt[leftIndex] = stackInt[leftIndex] + stackInt[rightIndex]
+				stackMeta[leftIndex] = valueKindInt
+				sp--
+				frame.Ip = ip + 1
+				continue
+			}
+		case bytecode.OpMul:
+			rightIndex := sp - 1
+			leftIndex := sp - 2
+			if stackMeta[leftIndex] == valueKindInt && stackMeta[rightIndex] == valueKindInt {
+				stackInt[leftIndex] = stackInt[leftIndex] * stackInt[rightIndex]
+				stackMeta[leftIndex] = valueKindInt
+				sp--
+				frame.Ip = ip + 1
+				continue
+			}
+		}
+		v.materializeFastState(sp)
+		v.sp = sp
 		handler := v.handlers[opcode]
 		if handler == nil {
 			return nil, fmt.Errorf("unknown opcode %d", opcode)
 		}
-		r, err := handler(v, opcode, frame.Fn.Instructions)
+		r, err := handler(v, opcode, ins)
 		if err != nil {
 			return nil, err
 		}
 		result = r
+		v.rebuildFastState(v.sp)
+		stack = v.stack
+		stackMeta = v.stackMeta
+		stackInt = v.stackInt
+		stackBool = v.stackBool
+		locals = v.locals
+		localMeta = v.localMeta
+		localInt = v.localInt
+		localBool = v.localBool
+		constants = v.constants
+		sp = v.sp
 	}
 
 	// 主程序执行完毕后，处理异步任务队列
+	v.materializeFastState(sp)
+	v.sp = sp
 	v.runAsyncTasks()
 	return result, nil
 }
@@ -173,10 +440,7 @@ func (v *VM) Run() (any, error) {
 func (v *VM) runAsyncTasks() (any, error) {
 	var result any
 
-
-
 	for _, task := range v.asyncTasks {
-
 
 		// 创建新的帧来执行异步任务
 		newFrame := &iface.Frame{
@@ -200,11 +464,11 @@ func (v *VM) runAsyncTasks() (any, error) {
 		for _, fn := range task.ToFunctions {
 			v.Push(fn)
 		}
-		
+
 		// 更新新帧的BasePointer，指向to表达式在栈中的起始位置
 		// 这样to表达式就位于 [BasePointer, BasePointer + ToCount) 的范围内
 		newFrame.BasePointer = taskSP
-				
+
 		// 执行任务
 		for v.frameIndex > savedFrameIndex {
 			frame := v.frames[v.frameIndex]
@@ -236,7 +500,7 @@ func (v *VM) runAsyncTasks() (any, error) {
 
 		// 恢复帧索引
 		v.frameIndex = savedFrameIndex
-		
+
 		// 恢复栈指针到任务执行前的位置
 		v.sp = taskSP
 	}
@@ -263,11 +527,295 @@ func (v *VM) RunLine(op bytecode.Opcode, ins bytecode.Instructions) (any, error)
 
 func (v *VM) Push(value any) {
 	v.stack[v.sp] = value
+	switch val := value.(type) {
+	case int64:
+		v.stackMeta[v.sp] = valueKindInt
+		v.stackInt[v.sp] = val
+	case bool:
+		v.stackMeta[v.sp] = valueKindBool
+		v.stackBool[v.sp] = val
+	default:
+		v.stackMeta[v.sp] = valueKindAny
+	}
 	v.sp++
 }
 
 func (v *VM) Pop() any {
 	v.sp--
-	value := v.stack[v.sp]
-	return value
+	switch v.stackMeta[v.sp] {
+	case valueKindInt:
+		return v.stackInt[v.sp]
+	case valueKindBool:
+		return v.stackBool[v.sp]
+	default:
+		return v.stack[v.sp]
+	}
+}
+
+func (v *VM) runFastPath(frame *iface.Frame, opcode bytecode.Opcode) (bool, error) {
+	ins := frame.Fn.Instructions
+	ip := frame.Ip
+	switch opcode {
+	case bytecode.OpConstant:
+		constIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+		constant := v.constants[constIndex]
+		v.stack[v.sp] = constant
+		v.sp++
+		frame.Ip = ip + 3
+		return true, nil
+	case bytecode.OpGetLocal:
+		localIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+		value := v.locals[localIndex]
+		v.stack[v.sp] = value
+		v.sp++
+		frame.Ip = ip + 3
+		return true, nil
+	case bytecode.OpSetLocal:
+		localIndex := int(ins[ip+1]) | int(ins[ip+2])<<8
+		v.sp--
+		value := v.stack[v.sp]
+		v.locals[localIndex] = value
+		frame.Ip = ip + 3
+		return true, nil
+	case bytecode.OpPop:
+		v.sp--
+		frame.Ip = ip + 1
+		return true, nil
+	case bytecode.OpDup:
+		sp := v.sp
+		if sp > 0 {
+			v.stack[sp] = v.stack[sp-1]
+			v.sp = sp + 1
+		}
+		frame.Ip = ip + 1
+		return true, nil
+	case bytecode.OpJump:
+		offset := int(ins[ip+1]) | int(ins[ip+2])<<8
+		frame.Ip += offset
+		return true, nil
+	case bytecode.OpLoop:
+		offset := int(int16(uint16(ins[ip+1]) | uint16(ins[ip+2])<<8))
+		frame.Ip += offset
+		return true, nil
+	case bytecode.OpJumpIfFalse:
+		v.sp--
+		condition := v.stack[v.sp]
+		offset := int(ins[ip+1]) | int(ins[ip+2])<<8
+		if !vmIsTruthy(condition) {
+			frame.Ip += offset
+		} else {
+			frame.Ip = ip + 3
+		}
+		return true, nil
+	case bytecode.OpIncrement:
+		sp := v.sp - 1
+		switch val := v.stack[sp].(type) {
+		case int64:
+			v.stack[sp] = val + 1
+		case float64:
+			v.stack[sp] = val + 1
+		default:
+			return false, nil
+		}
+		frame.Ip = ip + 1
+		return true, nil
+	case bytecode.OpLessThan:
+		sp := v.sp
+		right := v.stack[sp-1]
+		left := v.stack[sp-2]
+		newSp := sp - 2
+		if leftInt, ok := left.(int64); ok {
+			if rightInt, ok := right.(int64); ok {
+				result := leftInt < rightInt
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			if rightFloat, ok := right.(float64); ok {
+				result := float64(leftInt) < rightFloat
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			return false, nil
+		}
+		if leftFloat, ok := left.(float64); ok {
+			if rightInt, ok := right.(int64); ok {
+				result := leftFloat < float64(rightInt)
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			if rightFloat, ok := right.(float64); ok {
+				result := leftFloat < rightFloat
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			return false, nil
+		}
+		if leftStr, ok := left.(string); ok {
+			if rightStr, ok := right.(string); ok {
+				result := leftStr < rightStr
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+		}
+		return false, nil
+	case bytecode.OpPlus:
+		sp := v.sp
+		right := v.stack[sp-1]
+		left := v.stack[sp-2]
+		newSp := sp - 2
+		if leftInt, ok := left.(int64); ok {
+			if rightInt, ok := right.(int64); ok {
+				result := leftInt + rightInt
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			if rightFloat, ok := right.(float64); ok {
+				result := float64(leftInt) + rightFloat
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			return false, nil
+		}
+		if leftFloat, ok := left.(float64); ok {
+			if rightInt, ok := right.(int64); ok {
+				result := leftFloat + float64(rightInt)
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			if rightFloat, ok := right.(float64); ok {
+				result := leftFloat + rightFloat
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	case bytecode.OpMul:
+		sp := v.sp
+		right := v.stack[sp-1]
+		left := v.stack[sp-2]
+		newSp := sp - 2
+		if leftInt, ok := left.(int64); ok {
+			if rightInt, ok := right.(int64); ok {
+				result := leftInt * rightInt
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			if rightFloat, ok := right.(float64); ok {
+				result := float64(leftInt) * rightFloat
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			return false, nil
+		}
+		if leftFloat, ok := left.(float64); ok {
+			if rightInt, ok := right.(int64); ok {
+				result := leftFloat * float64(rightInt)
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			if rightFloat, ok := right.(float64); ok {
+				result := leftFloat * rightFloat
+				v.stack[newSp] = result
+				v.sp = newSp + 1
+				frame.Ip = ip + 1
+				return true, nil
+			}
+			return false, nil
+		}
+		return false, nil
+	default:
+		return false, nil
+	}
+}
+
+func vmIsTruthy(value any) bool {
+	switch v := value.(type) {
+	case bool:
+		return v
+	case int64:
+		return v != 0
+	case float64:
+		return v != 0
+	case string:
+		return v != ""
+	case nil:
+		return false
+	default:
+		return true
+	}
+}
+
+func (v *VM) materializeFastState(sp int) {
+	for i := 0; i < sp; i++ {
+		switch v.stackMeta[i] {
+		case valueKindInt:
+			v.stack[i] = v.stackInt[i]
+		case valueKindBool:
+			v.stack[i] = v.stackBool[i]
+		}
+	}
+	for i := 0; i < len(v.locals); i++ {
+		switch v.localMeta[i] {
+		case valueKindInt:
+			v.locals[i] = v.localInt[i]
+		case valueKindBool:
+			v.locals[i] = v.localBool[i]
+		}
+	}
+}
+
+func (v *VM) rebuildFastState(sp int) {
+	for i := 0; i < sp; i++ {
+		switch val := v.stack[i].(type) {
+		case int64:
+			v.stackMeta[i] = valueKindInt
+			v.stackInt[i] = val
+		case bool:
+			v.stackMeta[i] = valueKindBool
+			v.stackBool[i] = val
+		default:
+			v.stackMeta[i] = valueKindAny
+		}
+	}
+	v.rebuildLocalMeta()
+}
+
+func (v *VM) rebuildLocalMeta() {
+	for i := 0; i < len(v.locals); i++ {
+		switch val := v.locals[i].(type) {
+		case int64:
+			v.localMeta[i] = valueKindInt
+			v.localInt[i] = val
+		case bool:
+			v.localMeta[i] = valueKindBool
+			v.localBool[i] = val
+		default:
+			v.localMeta[i] = valueKindAny
+		}
+	}
 }

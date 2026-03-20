@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/binary"
 	"vine-lang/bytecode"
 	iface "vine-lang/vm/interface"
 )
@@ -9,7 +8,8 @@ import (
 // HandleJump 处理无条件跳转
 func HandleJump(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
-	offset := int(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
+	ip := frame.Ip
+	offset := int(ins[ip+1]) | int(ins[ip+2])<<8
 	frame.Ip += offset
 	return nil, nil
 }
@@ -17,12 +17,16 @@ func HandleJump(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructio
 // HandleJumpIfFalse 处理条件为假时跳转
 func HandleJumpIfFalse(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
-	condition := v.Pop()
-	offset := int(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
+	ip := frame.Ip
+	stack := v.GetStack()
+	sp := v.GetSP() - 1
+	condition := stack[sp]
+	v.SetSP(sp)
+	offset := int(ins[ip+1]) | int(ins[ip+2])<<8
 	if !isTruthy(condition) {
 		frame.Ip += offset
 	} else {
-		frame.Ip += 3
+		frame.Ip = ip + 3
 	}
 	return nil, nil
 }
@@ -30,12 +34,16 @@ func HandleJumpIfFalse(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Ins
 // HandleJumpIfTrue 处理条件为真时跳转
 func HandleJumpIfTrue(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
-	condition := v.Pop()
-	offset := int(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
+	ip := frame.Ip
+	stack := v.GetStack()
+	sp := v.GetSP() - 1
+	condition := stack[sp]
+	v.SetSP(sp)
+	offset := int(ins[ip+1]) | int(ins[ip+2])<<8
 	if isTruthy(condition) {
 		frame.Ip += offset
 	} else {
-		frame.Ip += 3
+		frame.Ip = ip + 3
 	}
 	return nil, nil
 }
@@ -43,7 +51,8 @@ func HandleJumpIfTrue(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Inst
 // HandleLoop 处理循环跳转
 func HandleLoop(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
-	offset := int16(binary.LittleEndian.Uint16(ins[frame.Ip+1:]))
+	ip := frame.Ip
+	offset := int(int16(uint16(ins[ip+1]) | uint16(ins[ip+2])<<8))
 	frame.Ip += int(offset)
 	return nil, nil
 }
