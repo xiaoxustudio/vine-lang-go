@@ -7,6 +7,7 @@ import (
 
 // HandleCallTask 处理任务调用
 // OpCallTask操作码用于调用一个任务，并处理与之关联的to表达式
+// 现在实现为异步调用，类似 JavaScript Promise
 func HandleCallTask(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()
 	stack := v.GetStack()
@@ -54,34 +55,14 @@ func HandleCallTask(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instru
 	// 更新栈指针
 	v.SetSP(sp)
 
-	// 调用函数
-	// 创建新的帧
-	newFrame := &iface.Frame{
-		Fn:          fn,
-		Ip:          0,
-		BasePointer: sp,
-		ToCount:     len(toFunctions),
-	}
-
-	frames := v.GetFrames()
-
-	// 获取前一个帧，并设置其ToCount，以便在返回时正确处理to表达式
-	if len(frames) > 0 {
-		frameIndex := v.GetFrameIndex()
-		frames[frameIndex].ToCount = len(toFunctions)
-	}
-
-	frames = append(frames, newFrame)
-	v.SetFrames(frames)
-	v.SetFrameIndex(v.GetFrameIndex() + 1)
-	// 将to表达式保存到栈中，位置在任务对象之后
-	for _, fn := range toFunctions {
-		v.Push(fn)
-	}
+	// 将异步任务添加到队列
+	// 注意：这里使用 sp 作为 basePointer，因为任务执行时需要从正确的位置开始
+	v.AddAsyncTask(fn, toFunctions, sp)
 
 	// 更新指令指针
 	// OpCallTask指令有2字节的操作数
 	frame.Ip += 3
 
-	return fn, nil
+	// 返回nil，不阻塞后续代码执行
+	return nil, nil
 }

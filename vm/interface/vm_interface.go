@@ -49,6 +49,8 @@ type VMInterface interface {
 	DefineEnvVar(name string, value any) error
 	// DefineEnvConst 定义环境常量
 	DefineEnvConst(name string, value any) error
+	// AddAsyncTask 添加异步任务
+	AddAsyncTask(fn *bytecode.CompiledFunction, toFunctions []*bytecode.CompiledFunction, basePointer int)
 }
 
 // Frame 虚拟机帧
