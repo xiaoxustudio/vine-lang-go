@@ -56,12 +56,11 @@ func HandleMemberExpr(c iface.CompilerInterface, node ast.Node) (any, error) {
 			pos := c.AddConstant(propName)
 			c.Emit(bytecode.OpGetMember, pos)
 		} else {
-			// 对于非字面量情况，正常编译
 			_, err := c.Compile(n.Property)
 			if err != nil {
 				return nil, err
 			}
-			c.Emit(bytecode.OpGetMember)
+			c.Emit(bytecode.OpIndex)
 		}
 	}
 	return nil, nil

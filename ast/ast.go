@@ -125,15 +125,6 @@ func (p *Property) NodeType() NodeType {
 	return p.Type
 }
 
-// type TemplateElement struct {
-// 	BaseNode
-// 	Value *Literal
-// }
-
-// type EmptyLineStmt struct {
-// 	BaseNode
-// }
-
 type CommentStmt struct {
 	BaseNode
 	Value token.Token
@@ -285,14 +276,6 @@ func (v *VariableDecl) NodeType() NodeType {
 
 // ================================== Expressions ==================================
 
-// // RangeExpr
-// type RangeExpr struct {
-// 	BaseNode
-// 	Start Expr
-// 	End   Expr
-// 	Step  token.Token
-// }
-
 // UnaryExpr
 type UnaryExpr struct {
 	BaseNode
@@ -418,14 +401,6 @@ func (a *AssignmentExpr) NodeType() NodeType {
 	return a.Type
 }
 
-// // TernaryExpr (Type: TernayExpression)
-// type TernaryExpr struct {
-// 	BaseNode
-// 	Condition  Expr
-// 	Consequent Expr
-// 	Alternate  Expr
-// }
-
 // ObjectExpr
 type ObjectExpr struct {
 	BaseNode
@@ -528,18 +503,6 @@ func (b *BinaryExpr) String() string {
 func (b *BinaryExpr) NodeType() NodeType {
 	return b.Type
 }
-
-// // TemplateLiteralExpr
-// type TemplateLiteralExpr struct {
-// 	BaseNode
-// 	Quotes []Node // TemplateElement | Expr
-// }
-
-// // IterableExpr (在 NodeType 中存在但未定义接口，补充定义)
-// type IterableExpr struct {
-// 	BaseNode
-// 	// 根据实际语法补充字段
-// }
 
 // ================================== Statements ==================================
 

@@ -73,63 +73,83 @@ func TransformPrintStringWithColor(args ...any) string {
 	if len(args) == 0 {
 		return ""
 	}
-	var s string
+	var parts []string
 	for i := range args {
-		switch current := args[i].(type) {
-		case string:
-			return fmt.Sprintf("%s%s%s", Color.Yellow, current, "\033[0m")
-		case bool:
-			return fmt.Sprintf("%s%v%s", Color.Cyan, current, "\033[0m")
-		case int, int64:
-			return fmt.Sprintf("%s%d%s", Color.Blue, current, "\033[0m")
-		case float32, float64:
-			return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
-		case map[string]any:
-			jsonBytes, _ := json.MarshalIndent(current, "", "  ")
-			return string(jsonBytes)
-		case token.Token:
-			switch current.Type {
-			case token.INT:
-				i, err := current.GetInt()
-				if err != nil {
-					return fmt.Sprintf("%s%s%s", Color.Red, "error", "\033[0m")
-				}
-				return fmt.Sprintf("%s%d%s", Color.Blue, i, "\033[0m")
-			case token.FLOAT:
-				f, err := current.GetFloat()
-				if err != nil {
-					return fmt.Sprintf("%s%s%s", Color.Red, "error", "\033[0m")
-				}
-				return fmt.Sprintf("%s%g%s", Color.Green, f, "\033[0m")
-			case token.STRING:
-			case token.NIL:
-				return fmt.Sprintf("%s%s%s", Color.Cyan, "nil", "\033[0m")
-			case token.TRUE, token.FALSE:
-				return fmt.Sprintf("%s%s%s", Color.Cyan, current.Value, "\033[0m")
-			}
-			return TransformPrintStringWithColor(current.Value)
-		case reflect.Value:
-			switch current.Kind() {
-			case reflect.Bool:
-				return fmt.Sprintf("%s%v%s", Color.Cyan, current.Bool(), "\033[0m")
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				return fmt.Sprintf("%s%d%s", Color.Blue, current.Int(), "\033[0m")
-			case reflect.Float32, reflect.Float64:
-				return fmt.Sprintf("%s%g%s", Color.Green, current.Float(), "\033[0m")
-			case reflect.String:
-				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
-			case reflect.Slice:
-				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
-			case reflect.Map:
-				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
-			default:
-				return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
-			}
-		default:
-			return fmt.Sprint(args...)
+		part := colorizeArg(args[i])
+		if part == "" {
+			part = fmt.Sprint(args[i])
 		}
+		parts = append(parts, part)
 	}
-	return s
+	return strings.Join(parts, " ")
+}
+
+func colorizeArg(arg any) string {
+	switch current := arg.(type) {
+	case string:
+		return fmt.Sprintf("%s%s%s", Color.Yellow, current, "\033[0m")
+	case bool:
+		return fmt.Sprintf("%s%v%s", Color.Cyan, current, "\033[0m")
+	case int:
+		return fmt.Sprintf("%s%d%s", Color.Blue, current, "\033[0m")
+	case int64:
+		return fmt.Sprintf("%s%d%s", Color.Blue, current, "\033[0m")
+	case float32:
+		return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
+	case float64:
+		return fmt.Sprintf("%s%g%s", Color.Green, current, "\033[0m")
+	case map[string]any:
+		jsonBytes, _ := json.MarshalIndent(current, "", "  ")
+		return string(jsonBytes)
+	case token.Token:
+		return colorizeToken(current)
+	case reflect.Value:
+		return colorizeReflectValue(current)
+	default:
+		return ""
+	}
+}
+
+func colorizeToken(current token.Token) string {
+	switch current.Type {
+	case token.INT:
+		i, err := current.GetInt()
+		if err != nil {
+			return fmt.Sprintf("%s%s%s", Color.Red, "error", "\033[0m")
+		}
+		return fmt.Sprintf("%s%d%s", Color.Blue, i, "\033[0m")
+	case token.FLOAT:
+		f, err := current.GetFloat()
+		if err != nil {
+			return fmt.Sprintf("%s%s%s", Color.Red, "error", "\033[0m")
+		}
+		return fmt.Sprintf("%s%g%s", Color.Green, f, "\033[0m")
+	case token.NIL:
+		return fmt.Sprintf("%s%s%s", Color.Cyan, "nil", "\033[0m")
+	case token.TRUE, token.FALSE:
+		return fmt.Sprintf("%s%s%s", Color.Cyan, current.Value, "\033[0m")
+	default:
+		return fmt.Sprintf("%s%s%s", Color.Yellow, current.Value, "\033[0m")
+	}
+}
+
+func colorizeReflectValue(current reflect.Value) string {
+	switch current.Kind() {
+	case reflect.Bool:
+		return fmt.Sprintf("%s%v%s", Color.Cyan, current.Bool(), "\033[0m")
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return fmt.Sprintf("%s%d%s", Color.Blue, current.Int(), "\033[0m")
+	case reflect.Float32, reflect.Float64:
+		return fmt.Sprintf("%s%g%s", Color.Green, current.Float(), "\033[0m")
+	case reflect.String:
+		return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+	case reflect.Slice:
+		return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+	case reflect.Map:
+		return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+	default:
+		return fmt.Sprintf("%s%s%s", Color.Yellow, current.String(), "\033[0m")
+	}
 }
 
 func BinaryVal(leftVal any, op token.TokenType, rightVal any) (any, error) {

@@ -14,11 +14,9 @@ type VError interface {
 	error
 	GetPosition() Position
 	Error() string
-	Return()
 }
 
 type LexerVError struct {
-	VError
 	Position
 	Message string
 }
@@ -32,7 +30,6 @@ func (pv LexerVError) Error() string {
 }
 
 type ParseVError struct {
-	VError
 	Position
 	Message string
 }
@@ -46,7 +43,6 @@ func (pv ParseVError) Error() string {
 }
 
 type InterpreterVError struct {
-	VError
 	Position
 	Message string
 }

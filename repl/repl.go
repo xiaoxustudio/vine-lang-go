@@ -6,13 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"vine-lang/compiler"
 	"vine-lang/env"
-	"vine-lang/lexer"
-	"vine-lang/parser"
-	"vine-lang/types"
+	"vine-lang/runner"
 	"vine-lang/utils"
-	"vine-lang/vm"
 )
 
 const (
@@ -20,40 +16,8 @@ const (
 	MULTI_PROMPT = "...   "
 )
 
-func init() {
-	env.SetExecuteCode(executeCodeForModule)
-}
+func init() { env.SetExecuteCode(runner.ExecuteCode) }
 
-func executeCodeForModule(filename string, code string, wk env.Workspace) (any, error) {
-	lex := lexer.New(filename, code)
-	lex.Parse()
-
-	p := parser.CreateParser(lex)
-
-	e := env.New(wk)
-	e.FileName = filename
-
-	c := compiler.NewCompiler(e)
-	ast := p.ParseProgram()
-	_, err := c.Compile(ast)
-	if err != nil {
-		return nil, err
-	}
-
-	v := vm.NewVM(c, e)
-	result, err := v.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	if e.Exports != nil {
-		return types.NewUserModule(filename, e.Exports), nil
-	}
-
-	return result, nil
-}
-
-// REPL 交互式环境结构
 type REPL struct {
 	env       *env.Environment
 	scanner   *bufio.Scanner
@@ -267,7 +231,6 @@ func (r *REPL) isBalanced(code string) bool {
 	return len(stack) == 0
 }
 
-// execute 执行代码
 func (r *REPL) execute(code string) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -280,22 +243,7 @@ func (r *REPL) execute(code string) {
 		return
 	}
 
-	lex := lexer.New("<repl>", code)
-	lex.Parse()
-
-	p := parser.CreateParser(lex)
-
-	c := compiler.NewCompiler(r.env)
-	ast := p.ParseProgram()
-	_, err := c.Compile(ast)
-	if err != nil {
-		fmt.Printf("compile errors: %v\n", err)
-		return
-	}
-
-	v := vm.NewVM(c, r.env)
-	result, err := v.Run()
-
+	result, err := runner.ExecuteCode("<repl>", code, r.env.WorkSpace)
 	if err != nil {
 		fmt.Printf("runtime errors: %v\n", err)
 		return

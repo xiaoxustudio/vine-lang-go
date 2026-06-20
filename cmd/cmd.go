@@ -108,9 +108,9 @@ func RunProjectOrFile(cmd *cobra.Command, args []string) {
 		targetFileName = filepath.Join(targetFileName, infoM.Main)
 	}
 
-	finnal, err := filepath.Abs(targetFileName)
+	final, err := filepath.Abs(targetFileName)
 
-	if err := executeVineFile(finnal, *wk); err != nil {
+	if err := executeVineFile(final, *wk); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

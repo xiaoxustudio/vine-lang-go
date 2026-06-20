@@ -160,7 +160,7 @@ func (c *Compiler) GetIndexScope(index int) *iface.CompilationScope {
 	return c.scopes[index]
 }
 
-func (c Compiler) Dismassemble() string {
+func (c Compiler) Disassemble() string {
 	var out strings.Builder
 	// 只显示主函数（第一个作用域）的指令
 	mainScope := c.scopes[0]
@@ -231,11 +231,10 @@ func (c *Compiler) SetScopeConstantValue(scope *iface.CompilationScope, index in
 
 // 创建一个 CompiledFunction 对象
 func (c *Compiler) Bytecode() *bytecode.CompiledFunction {
-	// 返回主函数（第一个作用域）的指令
 	mainScope := c.scopes[0]
 	return &bytecode.CompiledFunction{
 		Instructions:  mainScope.Instructions,
-		NumLocals:     0,
+		NumLocals:     len(mainScope.SymbolTable),
 		NumParameters: 0,
 	}
 }

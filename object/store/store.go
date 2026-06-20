@@ -31,42 +31,48 @@ func NewStoreObjectWithGoStruct(val any) *StoreObject {
 	var store = make(map[string]any)
 
 	originalType := t
+	originalVal := v
 
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 		v = v.Elem()
 	}
 
-	// 遍历字段
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		fieldValue := v.Field(i)
-		if fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() {
-			NewStoreObjectWithGoStruct(fieldValue.Interface())
-		} else if fieldValue.Kind() == reflect.Struct {
-			NewStoreObjectWithGoStruct(fieldValue.Interface())
+		if (fieldValue.Kind() == reflect.Ptr || fieldValue.Kind() == reflect.Struct) && fieldValue.IsValid() {
+			if fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() {
+				sub := NewStoreObjectWithGoStruct(fieldValue.Interface())
+				if sub != nil && !sub.IsEmpty() {
+					store[field.Name] = sub
+				}
+			} else if fieldValue.Kind() == reflect.Struct && fieldValue.CanInterface() {
+				store[field.Name] = fieldValue.Interface()
+			}
 		} else {
 			store[field.Name] = fieldValue.Interface()
 		}
 	}
+
 	methodType := originalType
-	// 遍历方法
+	methodVal := originalVal
 	for i := 0; i < methodType.NumMethod(); i++ {
 		method := methodType.Method(i)
 		store[method.Name] = func(_ ...any) any {
 			mType := method.Func.Type()
 			numIn := mType.NumIn()
 			args := make([]reflect.Value, numIn)
-			for i := range numIn {
-				pt := mType.In(i)
-				if pt.Kind() == reflect.Pointer {
-					args[i] = reflect.New(pt.Elem()).Elem().Addr()
-				} else {
-					args[i] = reflect.Zero(pt)
-				}
+			args[0] = methodVal
+			for j := 1; j < numIn; j++ {
+				pt := mType.In(j)
+				args[j] = reflect.Zero(pt)
 			}
 			results := method.Func.Call(args)
-			return results[0]
+			if len(results) > 0 {
+				return results[0].Interface()
+			}
+			return nil
 		}
 	}
 
@@ -76,7 +82,6 @@ func NewStoreObjectWithGoStruct(val any) *StoreObject {
 		parent:  nil,
 	}
 
-	// 重建nameMap
 	for k := range store {
 		s.nameMap[k] = token.Token{Type: token.IDENT, Value: k}
 	}

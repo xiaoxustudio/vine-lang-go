@@ -25,3 +25,8 @@ func HandleDup(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instruction
 	frame.Ip += 1
 	return nil, nil
 }
+
+// HandleDupWithMeta 处理复制栈顶元素，同时保留类型元数据（供内联调用使用）
+func HandleDupWithMeta(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+	return HandleDup(v, op, ins)
+}

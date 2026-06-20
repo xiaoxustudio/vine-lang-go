@@ -52,10 +52,8 @@ var definitions = map[Opcode]*Definition{
 }
 
 func Lookup(op Opcode, constants []any) (*Definition, error) {
-	for _, def := range definitions {
-		if def.Op == op {
-			return def, nil
-		}
+	if def, ok := definitions[op]; ok {
+		return def, nil
 	}
 	return nil, fmt.Errorf("opcode %d undefined", op)
 }

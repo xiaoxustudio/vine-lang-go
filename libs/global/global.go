@@ -78,5 +78,5 @@ func PrintWithColor(rangeArgs ...any) {
 
 // 获取对象内存地址
 func Id(val any) any {
-	return fmt.Sprintf("%p", &val)
+	return fmt.Sprintf("%p", val)
 }

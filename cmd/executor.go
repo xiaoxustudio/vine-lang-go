@@ -3,17 +3,13 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"vine-lang/compiler"
 	"vine-lang/env"
-	"vine-lang/lexer"
-	"vine-lang/parser"
-	"vine-lang/types"
+	"vine-lang/runner"
 	"vine-lang/verror"
-	"vine-lang/vm"
 )
 
 func init() {
-	env.SetExecuteCode(executeCode)
+	env.SetExecuteCode(runner.ExecuteCode)
 }
 
 func executeVineFile(filepath string, wk env.Workspace) error {
@@ -25,41 +21,12 @@ func executeVineFile(filepath string, wk env.Workspace) error {
 
 	bytes, err := os.ReadFile(filepath)
 	if err != nil {
-		return fmt.Errorf("无法读取文件 %s: %v", filepath, err)
+		return fmt.Errorf("cannot read file %s: %v", filepath, err)
 	}
 
-	_, err = executeCode(filepath, string(bytes), wk)
+	_, err = runner.ExecuteCode(filepath, string(bytes), wk)
 
 	return err
-}
-
-func executeCode(filename string, code string, wk env.Workspace) (any, error) {
-	lex := lexer.New(filename, code)
-	lex.Parse()
-
-	p := parser.CreateParser(lex)
-
-	e := env.New(wk)
-	e.FileName = filename
-
-	c := compiler.NewCompiler(e)
-	ast := p.ParseProgram()
-	_, err := c.Compile(ast)
-	if err != nil {
-		return nil, err
-	}
-
-	v := vm.NewVM(c, e)
-	result, err := v.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	if e.Exports != nil {
-		return types.NewUserModule(filename, e.Exports), nil
-	}
-
-	return result, nil
 }
 
 func handleError(r any) {
