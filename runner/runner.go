@@ -11,7 +11,9 @@ import (
 
 func ExecuteCode(filename string, code string, wk env.Workspace) (any, error) {
 	lex := lexer.New(filename, code)
-	lex.Parse()
+	if err := lex.Parse(); err != nil {
+		return nil, err
+	}
 
 	p := parser.CreateParser(lex)
 

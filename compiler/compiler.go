@@ -14,8 +14,6 @@ import (
 type Compiler struct {
 	handlers     map[ast.NodeType]iface.CompileFunc // 编译器处理函数
 	constants    []any                              // 对应的常量池
-	instructions []bytecode.Instructions            // 字节码指令集
-
 	// 作用域 / 符号表
 	symbolTable *store.StoreObject
 	scopes      []*iface.CompilationScope
@@ -96,12 +94,6 @@ func (c *Compiler) AddConstant(constant any) int {
 	// 常量不存在，添加到常量池
 	c.constants = append(c.constants, constant)
 	return len(c.constants) - 1
-}
-
-// 添加指令，并返回指令的位置
-func (c *Compiler) AddInstruction(ins bytecode.Instructions) int {
-	c.instructions = append(c.instructions, ins)
-	return len(c.instructions) - 1
 }
 
 func (c *Compiler) Emit(op bytecode.Opcode, operands ...int) int {

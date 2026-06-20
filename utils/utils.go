@@ -217,7 +217,7 @@ func binaryIntegers(left int64, op token.TokenType, right int64) (any, error) {
 	case token.DIV:
 		// 整数除法，如果不能整除则返回浮点数
 		if right == 0 {
-			return false, fmt.Errorf("division by zero")
+			return 0, fmt.Errorf("division by zero")
 		}
 		if left%right == 0 {
 			return left / right, nil
@@ -238,7 +238,7 @@ func binaryNumbers(left float64, op token.TokenType, right float64) (any, error)
 		return left * right, nil
 	case token.DIV:
 		if right == 0 {
-			return false, fmt.Errorf("division by zero")
+			return 0, fmt.Errorf("division by zero")
 		}
 		return left / right, nil
 	default:

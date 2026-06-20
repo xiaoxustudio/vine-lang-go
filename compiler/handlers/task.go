@@ -8,8 +8,6 @@ import (
 	"vine-lang/token"
 )
 
-var _ = iface.CompilerInterface(nil)
-
 func HandleTaskStmt(c iface.CompilerInterface, node ast.Node) (any, error) {
 	n := node.(*ast.TaskStmt)
 

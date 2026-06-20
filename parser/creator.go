@@ -36,7 +36,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		var source *ast.Literal
 		likeSource := p.parsePrimaryExpression()
 		if _, e := likeSource.(*ast.Literal); !e {
-			panic(fmt.Sprintf("expected literal, got %s", likeSource.String()))
+			p.errorf(p.peek(), "expected literal, got %s", likeSource.String())
 		}
 		source = likeSource.(*ast.Literal)
 		var specifiers []ast.Specifier
@@ -60,7 +60,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 							if al, ok := aliasExpr.(*ast.Literal); ok {
 								aliasLit = al
 							} else {
-								panic(fmt.Sprintf("expected alias literal, got %s", aliasExpr.String()))
+								p.errorf(p.peek(), "expected alias literal, got %s", aliasExpr.String())
 							}
 						}
 						specifiers = append(specifiers, ast.NewUseSpecifier(lit, aliasLit))
@@ -83,12 +83,12 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 						if al, ok := aliasExpr.(*ast.Literal); ok {
 							aliasLit = al
 						} else {
-							panic(fmt.Sprintf("expected alias literal, got %s", aliasExpr.String()))
+							p.errorf(p.peek(), "expected alias literal, got %s", aliasExpr.String())
 						}
 					}
 					specifiers = append(specifiers, ast.NewUseSpecifier(lit, aliasLit))
 				} else {
-					panic(fmt.Sprintf("expected literal, got %s", remoteExpr.String()))
+					p.errorf(p.peek(), "expected literal, got %s", remoteExpr.String())
 				}
 				return ast.NewUseDecl(source, specifiers, token.PICK)
 			}
@@ -193,7 +193,7 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 		for !p.isEof() && p.peek().Type != token.END {
 			var expr = p.parseSwitchCase()
 			if isDefinedDefault {
-				panic("default case already defined")
+				p.errorf(p.peek(), "default case already defined")
 			}
 			if expr != nil {
 				if _case, ok := expr.(*ast.SwitchCase); ok {
@@ -201,9 +201,9 @@ func CreateParser(lex *lexer.Lexer) *Parser {
 					if expr.(*ast.SwitchCase).IsDefault {
 						isDefinedDefault = true
 					}
-				} else {
-					panic("expected switch case")
-				}
+					} else {
+						p.errorf(p.peek(), "expected switch case")
+					}
 			}
 		}
 		p.expect(token.END)

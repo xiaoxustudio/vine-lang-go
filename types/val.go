@@ -90,7 +90,7 @@ type FunctionLikeValNode struct {
 	Token    *token.Token
 	Args     *ast.ArgsExpr
 	Body     *ast.BlockStmt
-	IsLamda  bool // 是否是匿名函数
+	IsLambda bool
 	IsModule bool // 是否是模块
 	IsInside bool // 是否是模块内部函数
 	IsTask   bool // 是否是协程函数

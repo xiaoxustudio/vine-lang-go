@@ -13,7 +13,6 @@ func NewCompiler(e *env.Environment) *Compiler {
 	c := &Compiler{
 		handlers:     make(map[ast.NodeType]iface.CompileFunc),
 		constants:    make([]any, 0),
-		instructions: make([]bytecode.Instructions, 0),
 		symbolTable:  store.NewStoreObject(),
 		scopes:       []*iface.CompilationScope{},
 		scopeIndex:   -1,

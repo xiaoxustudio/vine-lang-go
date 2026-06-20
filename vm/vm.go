@@ -8,6 +8,7 @@ import (
 	"vine-lang/token"
 	iface "vine-lang/vm/interface"
 	"vine-lang/vm/types"
+	"vine-lang/vm/vutils"
 )
 
 const (
@@ -353,7 +354,7 @@ func (v *VM) Run() (any, error) {
 			case valueKindBool:
 				isTruthy = stackBool[sp]
 			default:
-				isTruthy = vmIsTruthy(stack[sp])
+				isTruthy = vutils.IsTruthy(stack[sp])
 			}
 			if !isTruthy {
 				frame.Ip += offset
@@ -608,23 +609,6 @@ func (v *VM) Pop() any {
 }
 
 
-
-func vmIsTruthy(value any) bool {
-	switch v := value.(type) {
-	case bool:
-		return v
-	case int64:
-		return v != 0
-	case float64:
-		return v != 0
-	case string:
-		return v != ""
-	case nil:
-		return false
-	default:
-		return true
-	}
-}
 
 func (v *VM) materializeFastState(sp int) {
 	for i := 0; i < sp; i++ {

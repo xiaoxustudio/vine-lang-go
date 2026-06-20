@@ -48,7 +48,7 @@ func HandleSwitchCaseStmt(c iface.CompilerInterface, node ast.Node) (any, error)
 	} else {
 		// default case，直接跳转到这里
 		// 需要从switch语句中获取跳转位置
-		if currentScope.DefaultCasePos == 0 {
+		if currentScope.DefaultCasePos == -1 {
 			currentScope.DefaultCasePos = len(currentScope.Instructions)
 			// default case需要弹出测试值，因为跳转时测试值还在栈上
 			c.Emit(bytecode.OpPop)

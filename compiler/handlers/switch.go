@@ -33,7 +33,7 @@ func HandleSwitchStmt(c iface.CompilerInterface, node ast.Node) (any, error) {
 
 	// 如果有default case，添加跳转到default case的指令
 	var defaultJumpPos int = -1
-	if currentScope.DefaultCasePos != 0 {
+	if currentScope.DefaultCasePos != -1 {
 		// 所有case都不匹配时，跳转到default case
 		// 先占位，稍后填充跳转位置
 		defaultJumpPos = c.Emit(bytecode.OpJump, 9999)

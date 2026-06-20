@@ -266,14 +266,15 @@ func (l *Lexer) GetToken() (token.Token, error) {
 	return tok, nil
 }
 
-func (l *Lexer) Parse() {
+func (l *Lexer) Parse() error {
 	for !l.isEof() {
 		tok, err := l.GetToken()
 		if err != nil {
-			panic(err)
+			return err
 		}
 		l.tokens = append(l.tokens, tok)
 	}
+	return nil
 }
 
 func (l *Lexer) Tokens() []token.Token {
