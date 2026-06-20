@@ -10,21 +10,23 @@ import (
 
 func NewVM(c *compiler.Compiler, env *env.Environment) *VM {
 	v := &VM{
-		constants:  c.GetConstantRaw(),
-		stack:      make([]any, 256),
-		stackMeta:  make([]uint8, 256),
-		stackInt:   make([]int64, 256),
-		stackBool:  make([]bool, 256),
-		sp:         0,
-		frames:     make([]*iface.Frame, 1),
-		frameIndex: 0,
-		globals:    make([]any, 256),
-		locals:     make([]any, 256),
-		localMeta:  make([]uint8, 256),
-		localInt:   make([]int64, 256),
-		localBool:  make([]bool, 256),
-		handlers:   [256]iface.VMFunc{},
-		env:        env,
+		constants:     c.GetConstantRaw(),
+		stack:         make([]any, 256),
+		stackMeta:     make([]uint8, 256),
+		stackInt:      make([]int64, 256),
+		stackBool:     make([]bool, 256),
+		sp:            0,
+		frames:        make([]*iface.Frame, 1),
+		frameIndex:    0,
+		globals:       make([]any, 256),
+		locals:        make([]any, 256),
+		localMeta:     make([]uint8, 256),
+		localInt:      make([]int64, 256),
+		localBool:     make([]bool, 256),
+		handlers:      [256]iface.VMFunc{},
+		env:           env,
+		stackCapacity: 256,
+		localCapacity: 256,
 	}
 
 	// 初始化主帧

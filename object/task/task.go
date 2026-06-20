@@ -62,16 +62,17 @@ func (t *TaskObject) GetParent() *TaskObject {
 
 func (t *TaskObject) Run(args ...[]any) {
 	t.state = TaskStateRunning
-
-	t.wg.Go(func() {
+	t.wg.Add(1)
+	go func() {
 		defer func() {
 			if err := recover(); err != nil {
 				t.result = t.catchFn(err)
 			}
+			t.wg.Done()
 			t.Done()
 		}()
 		t.result = t.fn(args...)
-	})
+	}()
 }
 
 func (t *TaskObject) Catch(fn func(err any) any) *TaskObject {

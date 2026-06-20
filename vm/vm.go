@@ -37,6 +37,10 @@ type VM struct {
 
 	// 异步任务队列
 	asyncTasks []*types.AsyncTask
+
+	// 栈扩容策略
+	stackCapacity int
+	localCapacity int
 }
 
 func (v *VM) RegisterOpenCodeHandler(op bytecode.Opcode, handler iface.VMFunc) {
@@ -103,7 +107,34 @@ func (v *VM) SetLocals(locals []any) {
 	v.rebuildLocalMeta()
 }
 
+func (v *VM) expandLocals(minIndex int) {
+	if minIndex >= len(v.locals) {
+		newCap := v.localCapacity * 2
+		if v.localCapacity == 0 {
+			newCap = 256
+		}
+		if minIndex >= newCap {
+			newCap = minIndex + 128
+		}
+		newLocals := make([]any, newCap)
+		newLocalMeta := make([]uint8, newCap)
+		newLocalInt := make([]int64, newCap)
+		newLocalBool := make([]bool, newCap)
+		copy(newLocals, v.locals)
+		copy(newLocalMeta, v.localMeta)
+		copy(newLocalInt, v.localInt)
+		copy(newLocalBool, v.localBool)
+		v.locals = newLocals
+		v.localMeta = newLocalMeta
+		v.localInt = newLocalInt
+		v.localBool = newLocalBool
+		v.localCapacity = newCap
+	}
+}
+
 func (v *VM) LoadLocalToStack(index int) any {
+	v.expandLocals(index)
+	v.expandStack()
 	switch v.localMeta[index] {
 	case valueKindInt:
 		val := v.localInt[index]
@@ -127,6 +158,7 @@ func (v *VM) LoadLocalToStack(index int) any {
 }
 
 func (v *VM) StoreLocalFromStack(index int) any {
+	v.expandLocals(index)
 	v.sp--
 	switch v.stackMeta[v.sp] {
 	case valueKindInt:
@@ -525,7 +557,30 @@ func (v *VM) RunLine(op bytecode.Opcode, ins bytecode.Instructions) (any, error)
 	return v.CallOpenCodeHandler(op, ins)
 }
 
+func (v *VM) expandStack() {
+	if v.sp >= len(v.stack) {
+		newCap := v.stackCapacity * 2
+		if v.stackCapacity == 0 {
+			newCap = 256
+		}
+		newStack := make([]any, newCap)
+		newStackMeta := make([]uint8, newCap)
+		newStackInt := make([]int64, newCap)
+		newStackBool := make([]bool, newCap)
+		copy(newStack, v.stack)
+		copy(newStackMeta, v.stackMeta)
+		copy(newStackInt, v.stackInt)
+		copy(newStackBool, v.stackBool)
+		v.stack = newStack
+		v.stackMeta = newStackMeta
+		v.stackInt = newStackInt
+		v.stackBool = newStackBool
+		v.stackCapacity = newCap
+	}
+}
+
 func (v *VM) Push(value any) {
+	v.expandStack()
 	v.stack[v.sp] = value
 	switch val := value.(type) {
 	case int64:
