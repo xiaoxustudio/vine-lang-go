@@ -96,15 +96,15 @@ func (e *Environment) GetFast(name string) (any, bool) {
 	return nil, false
 }
 
-func (e *Environment) Lookup(name Token) (Environment, Token) {
+func (e *Environment) Lookup(name Token) (*Environment, Token) {
 	if tk, exists := e.nameMap[name.Value]; exists {
-		return *e, tk
+		return e, tk
 	}
 	if e.parent != nil && !e.isPassing {
 		return e.parent.Lookup(name)
 	}
 
-	return Environment{}, Token{}
+	return nil, Token{}
 }
 
 func (e *Environment) Set(name Token, val any) {

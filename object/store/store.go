@@ -166,14 +166,14 @@ func (s *StoreObject) Get(name token.Token) (any, bool) {
 	return nil, false
 }
 
-func (e *StoreObject) Lookup(name token.Token) (StoreObject, token.Token) {
+func (e *StoreObject) Lookup(name token.Token) (*StoreObject, token.Token) {
 	if tk, exists := e.nameMap[name.Value]; exists {
-		return *e, tk
+		return e, tk
 	}
 	if e.parent != nil {
 		return e.parent.Lookup(name)
 	}
-	return StoreObject{}, token.Token{}
+	return nil, token.Token{}
 }
 
 func (e *StoreObject) Set(name token.Token, val any) {

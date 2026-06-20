@@ -16,7 +16,9 @@ func NewPooled(fileName string) *Environment {
 	e := envPool.Get().(*Environment)
 	e.FileName = fileName
 	e.parent = nil
+	e.MountScope = nil
 	e.Exports = nil
+	e.isPassing = false
 	for k := range e.consts {
 		delete(e.consts, k)
 	}
@@ -32,6 +34,18 @@ func NewPooled(fileName string) *Environment {
 func (e *Environment) Release() {
 	if e != nil {
 		e.parent = nil
+		e.MountScope = nil
+		e.Exports = nil
+		e.isPassing = false
+		for k := range e.consts {
+			delete(e.consts, k)
+		}
+		for k := range e.store {
+			delete(e.store, k)
+		}
+		for k := range e.nameMap {
+			delete(e.nameMap, k)
+		}
 		envPool.Put(e)
 	}
 }

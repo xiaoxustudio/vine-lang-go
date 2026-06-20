@@ -68,9 +68,9 @@ func (t *TaskObject) Run(args ...[]any) {
 			if err := recover(); err != nil {
 				t.result = t.catchFn(err)
 			}
+			t.Done()
 		}()
 		t.result = t.fn(args...)
-		t.Done()
 	})
 }
 
