@@ -3,11 +3,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"vine-lang/compiler"
 	"vine-lang/env"
-	"vine-lang/ipt"
 	"vine-lang/lexer"
 	"vine-lang/parser"
+	"vine-lang/types"
 	"vine-lang/verror"
+	"vine-lang/vm"
 )
 
 func init() {
@@ -40,9 +42,24 @@ func executeCode(filename string, code string, wk env.Workspace) (any, error) {
 	e := env.New(wk)
 	e.FileName = filename
 
-	i := ipt.New(p, e)
+	c := compiler.NewCompiler(e)
+	ast := p.ParseProgram()
+	_, err := c.Compile(ast)
+	if err != nil {
+		return nil, err
+	}
 
-	return i.EvalSafe()
+	v := vm.NewVM(c, e)
+	result, err := v.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	if e.Exports != nil {
+		return types.NewUserModule(filename, e.Exports), nil
+	}
+
+	return result, nil
 }
 
 func handleError(r any) {

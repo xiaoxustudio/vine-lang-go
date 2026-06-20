@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"vine-lang/compiler"
 	"vine-lang/env"
-	"vine-lang/ipt"
 	"vine-lang/lexer"
 	"vine-lang/parser"
+	"vine-lang/types"
 	"vine-lang/utils"
-	"vine-lang/verror"
+	"vine-lang/vm"
 )
 
 const (
@@ -31,9 +33,24 @@ func executeCodeForModule(filename string, code string, wk env.Workspace) (any, 
 	e := env.New(wk)
 	e.FileName = filename
 
-	i := ipt.New(p, e)
+	c := compiler.NewCompiler(e)
+	ast := p.ParseProgram()
+	_, err := c.Compile(ast)
+	if err != nil {
+		return nil, err
+	}
 
-	return i.EvalSafeWithDefer()
+	v := vm.NewVM(c, e)
+	result, err := v.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	if e.Exports != nil {
+		return types.NewUserModule(filename, e.Exports), nil
+	}
+
+	return result, nil
 }
 
 // REPL 交互式环境结构
@@ -263,19 +280,24 @@ func (r *REPL) execute(code string) {
 		return
 	}
 
-	// 词法分析
 	lex := lexer.New("<repl>", code)
 	lex.Parse()
 
-	// 语法分析
 	p := parser.CreateParser(lex)
 
-	// 解释执行
-	i := ipt.New(p, r.env)
-	result, err := i.EvalSafeWithDefer()
+	c := compiler.NewCompiler(r.env)
+	ast := p.ParseProgram()
+	_, err := c.Compile(ast)
+	if err != nil {
+		fmt.Printf("compile errors: %v\n", err)
+		return
+	}
+
+	v := vm.NewVM(c, r.env)
+	result, err := v.Run()
 
 	if err != nil {
-		fmt.Printf("repl errors: %v\n", err)
+		fmt.Printf("runtime errors: %v\n", err)
 		return
 	}
 
@@ -287,18 +309,7 @@ func (r *REPL) execute(code string) {
 
 // handleError 处理错误
 func (r *REPL) handleError(rec interface{}) {
-	switch err := rec.(type) {
-	case verror.VError:
-		fmt.Println(err.Error())
-	case verror.ParseVError:
-		fmt.Println(err.Error())
-	case verror.InterpreterVError:
-		fmt.Println(err.Error())
-	case verror.LexerVError:
-		fmt.Println(err.Error())
-	default:
-		fmt.Printf("repl errors: %v\n", rec)
-	}
+	fmt.Printf("repl errors: %v\n", rec)
 }
 
 // printHelp 打印帮助信息

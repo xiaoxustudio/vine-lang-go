@@ -6,29 +6,26 @@ import (
 	"strings"
 	"testing"
 
+	"vine-lang/compiler"
 	"vine-lang/env"
-	"vine-lang/ipt"
 	"vine-lang/lexer"
 	"vine-lang/parser"
+	"vine-lang/types"
+	"vine-lang/vm"
 )
 
 var examplesDir = "example"
 
-// TestExamples 测试examples文件夹下的所有.vine文件
 func TestExamples(t *testing.T) {
-
-	// 遍历examples文件夹
 	err := filepath.Walk(examplesDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// 只处理.vine文件
 		if !strings.HasSuffix(path, ".vine") {
 			return nil
 		}
 
-		// 跳过子目录中的测试文件
 		if filepath.Dir(path) != examplesDir {
 			return nil
 		}
@@ -45,16 +42,12 @@ func TestExamples(t *testing.T) {
 	}
 }
 
-// TestExamplesRecursive 递归测试examples文件夹下的所有.vine文件
 func TestExamplesRecursive(t *testing.T) {
-
-	// 遍历examples文件夹及其子目录
 	err := filepath.Walk(examplesDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// 只处理.vine文件
 		if !strings.HasSuffix(path, ".vine") {
 			return nil
 		}
@@ -71,47 +64,37 @@ func TestExamplesRecursive(t *testing.T) {
 	}
 }
 
-// testVineFile 测试单个.vine文件
 func testVineFile(t *testing.T, filepath_ string) {
-	// 读取文件内容
 	content, err := os.ReadFile(filepath_)
 	if err != nil {
 		t.Fatalf("Failed to read file %s: %v", filepath_, err)
 	}
 
-	// 获取文件所在的目录
 	fileDir := filepath.Dir(filepath_)
 
-	// 创建工作区
 	wk := &env.Workspace{
 		Root:     ".",
 		BasePath: fileDir,
 		FileName: filepath_,
 	}
 
-	// 执行代码
 	_, err = executeCode(filepath_, string(content), *wk)
 	if err != nil {
 		t.Errorf("Failed to execute %s: %v", filepath_, err)
 	}
 }
 
-// BenchmarkExamples 基准测试examples文件夹下的所有.vine文件
 func BenchmarkExamples(b *testing.B) {
-
-	// 收集所有.vine文件
 	var files []string
 	err := filepath.Walk(examplesDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// 只处理.vine文件
 		if !strings.HasSuffix(path, ".vine") {
 			return nil
 		}
 
-		// 跳过子目录中的测试文件
 		if filepath.Dir(path) != examplesDir {
 			return nil
 		}
@@ -124,7 +107,6 @@ func BenchmarkExamples(b *testing.B) {
 		b.Fatalf("Failed to walk examples directory: %v", err)
 	}
 
-	// 对每个文件进行基准测试
 	for _, file := range files {
 		b.Run(file, func(b *testing.B) {
 			benchmarkVineFile(b, file)
@@ -132,15 +114,12 @@ func BenchmarkExamples(b *testing.B) {
 	}
 }
 
-// benchmarkVineFile 基准测试单个.vine文件
 func benchmarkVineFile(b *testing.B, filepath string) {
-	// 读取文件内容
 	content, err := os.ReadFile(filepath)
 	if err != nil {
 		b.Fatalf("Failed to read file %s: %v", filepath, err)
 	}
 
-	// 创建工作区
 	wk := &env.Workspace{
 		Root:     ".",
 		BasePath: ".",
@@ -156,7 +135,6 @@ func benchmarkVineFile(b *testing.B, filepath string) {
 	}
 }
 
-// executeCode 执行vine代码
 func executeCode(filename string, code string, wk env.Workspace) (any, error) {
 	lex := lexer.New(filename, code)
 	lex.Parse()
@@ -166,7 +144,22 @@ func executeCode(filename string, code string, wk env.Workspace) (any, error) {
 	e := env.New(wk)
 	e.FileName = filename
 
-	i := ipt.New(p, e)
+	c := compiler.NewCompiler(e)
+	ast := p.ParseProgram()
+	_, err := c.Compile(ast)
+	if err != nil {
+		return nil, err
+	}
 
-	return i.EvalSafe()
+	v := vm.NewVM(c, e)
+	result, err := v.Run()
+	if err != nil {
+		return nil, err
+	}
+
+	if e.Exports != nil {
+		return types.NewUserModule(filename, e.Exports), nil
+	}
+
+	return result, nil
 }
