@@ -32,6 +32,7 @@ var definitions = map[Opcode]*Definition{
 	OpCallTask:     {"OpCallTask", []int{2}, OpCallTask},
 	OpReturn:       {"OpReturn", nil, OpReturn},
 	OpIndex:        {"OpIndex", nil, OpIndex},
+	OpLen:          {"OpLen", nil, OpLen},
 	OpSetIndex:     {"OpSetIndex", nil, OpSetIndex},
 	OpGetMember:    {"OpGetMember", []int{2}, OpGetMember},
 	OpSetMember:    {"OpSetMember", []int{2}, OpSetMember},

@@ -46,6 +46,7 @@ const (
 	OpCall
 	OpReturn
 	OpIndex    // 索引
+	OpLen      // 获取长度
 	OpSetIndex // 设置索引
 	OpGetMember
 	OpSetMember // 设置成员

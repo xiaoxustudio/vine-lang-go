@@ -51,15 +51,10 @@ func HandleAssignmentExpr(c iface.CompilerInterface, node ast.Node) (any, error)
 	switch left := n.Left.(type) {
 	case *ast.Literal:
 		if left.Value.Type == token.IDENT {
-			// 标识符赋值
 			varName := left.Value.Value
-			// 检查是否为局部变量
-			currentScope := c.CurrentScope()
-			if localIndex, ok := currentScope.SymbolTable[varName]; ok {
-				// 局部变量
-				c.Emit(bytecode.OpSetLocal, localIndex)
+			if isLocal, index := c.ResolveVariable(varName); isLocal {
+				c.Emit(bytecode.OpSetLocal, index)
 			} else {
-				// 全局变量
 				pos := c.AddConstant(varName)
 				c.Emit(bytecode.OpSetGlobal, pos)
 			}

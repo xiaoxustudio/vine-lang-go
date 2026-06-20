@@ -15,7 +15,7 @@ func HandleSwitchStmt(c iface.CompilerInterface, node ast.Node) (any, error) {
 	oldJumpPositions := currentScope.JumpPositions
 	oldDefaultCasePos := currentScope.DefaultCasePos
 	currentScope.JumpPositions = make([]int, 0)
-	currentScope.DefaultCasePos = 0
+	currentScope.DefaultCasePos = -1
 
 	// 编译条件表达式，结果压入栈顶
 	_, err := c.Compile(n.Test)

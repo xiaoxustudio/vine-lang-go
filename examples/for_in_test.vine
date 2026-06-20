@@ -1,0 +1,31 @@
+use glb pick print
+
+print("=== test 1: basic sum ===")
+let a = [1, 2, 3]
+let sum = 0
+for i in a:
+    sum = sum + i
+end
+print(sum)
+
+print("=== test 2: empty array ===")
+let empty = []
+for i in empty:
+    print(i)
+end
+print("done")
+
+print("=== test 3: print values ===")
+for i in [5, 4, 3]:
+    print(i)
+end
+print("done")
+
+print("=== test 4: nested scope with parent vars ===")
+let x = 100
+let arr = [10, 20, 30]
+for v in arr:
+    let y = x + v
+    print(y)
+end
+print("done")

@@ -1,12 +1,5 @@
 use glb pick print
 
-
-# let num = 1
-
-# n
-
-# print(num)
-
 task fn call():
     1
 end

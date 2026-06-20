@@ -229,6 +229,26 @@ func HandleArray(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructi
 	return array, nil
 }
 
+// HandleLen 获取集合长度
+func HandleLen(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
+	frame := v.CurrentFrame()
+	value := v.Pop()
+	var length int
+	switch obj := value.(type) {
+	case []any:
+		length = len(obj)
+	case string:
+		length = len(obj)
+	case map[string]any:
+		length = len(obj)
+	default:
+		return nil, fmt.Errorf("cannot get length of type %T", value)
+	}
+	v.Push(int64(length))
+	frame.Ip += 1
+	return nil, nil
+}
+
 // HandleObject 处理创建对象
 func HandleObject(v iface.VMInterface, op bytecode.Opcode, ins bytecode.Instructions) (any, error) {
 	frame := v.CurrentFrame()

@@ -51,7 +51,7 @@ type CompilationScope struct {
 	Parent         *CompilationScope // 父作用域
 	ConstantValues map[int]any       // 局部变量的常量值，用于常量传播优化
 	JumpPositions  []int             // 需要修复的跳转位置列表
-	DefaultCasePos int               // default case的位置
+	DefaultCasePos int               // default case的位置，-1表示不存在
 }
 
 type EmittedInstruction struct {
