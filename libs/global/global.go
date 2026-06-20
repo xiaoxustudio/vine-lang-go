@@ -60,7 +60,7 @@ func Print(rangeArgs ...any) {
 			fmt.Print(fmt.Sprintf("<error %p>", v), " ")
 		}
 
-		fmt.Print(utils.TrasformPrintStringWithColor(arg), " ")
+		fmt.Print(utils.TransformPrintStringWithColor(arg), " ")
 	}
 	fmt.Println()
 }
@@ -71,7 +71,7 @@ func PrintWithColor(rangeArgs ...any) {
 	}
 
 	for _, arg := range rangeArgs {
-		fmt.Print(utils.TrasformPrintStringWithColor(arg), " ")
+		fmt.Print(utils.TransformPrintStringWithColor(arg), " ")
 	}
 	fmt.Println()
 }

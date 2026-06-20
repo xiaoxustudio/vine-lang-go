@@ -414,13 +414,30 @@ func (p *Parser) parsePropertyExpression() []*ast.Property {
 	return properties
 }
 
+func (p *Parser) parseArrayElements() []ast.Expr {
+	var items []ast.Expr
+	for p.peek().Type != token.RBRACKET && !p.isEof() {
+		expr := p.parseExpression()
+		if expr == nil {
+			break
+		}
+		if p.peek().Type == token.COMMA {
+			p.advance()
+		}
+		items = append(items, expr)
+		for p.peek().Type == token.NEWLINE {
+			p.advance()
+		}
+	}
+	return items
+}
+
 func (p *Parser) parseArrayExpression() ast.Expr {
 	if p.isEof() {
 		return nil
 	}
-	args := p.parsePropertyExpression()
-	arr := ast.NewArrayExpr(args)
-	return arr
+	items := p.parseArrayElements()
+	return ast.NewArrayExpr(items)
 }
 
 func (p *Parser) parseObjectExpression() ast.Expr {

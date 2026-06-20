@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"unicode"
 	"vine-lang/token"
 )
@@ -34,22 +35,22 @@ func Keys[M ~map[K]V, K comparable, V any](m M) []K {
 }
 
 /* 转换字符 */
-func TrasformPrintString(args ...any) string {
+func TransformPrintString(args ...any) string {
 	if len(args) == 0 {
 		return ""
 	}
-	var s string
-	for i := range args {
-		switch current := args[i].(type) {
+	var parts []string
+	for _, arg := range args {
+		switch current := arg.(type) {
 		case string:
-			return current
+			parts = append(parts, current)
 		case token.Token:
-			return current.Value
+			parts = append(parts, current.Value)
 		default:
-			return fmt.Sprint(args...)
+			parts = append(parts, fmt.Sprint(arg))
 		}
 	}
-	return s
+	return strings.Join(parts, " ")
 }
 
 type ColorPrint struct {
@@ -68,7 +69,7 @@ var Color = ColorPrint{
 	Cyan:   "\033[36m",
 }
 
-func TrasformPrintStringWithColor(args ...any) string {
+func TransformPrintStringWithColor(args ...any) string {
 	if len(args) == 0 {
 		return ""
 	}
@@ -106,7 +107,7 @@ func TrasformPrintStringWithColor(args ...any) string {
 			case token.TRUE, token.FALSE:
 				return fmt.Sprintf("%s%s%s", Color.Cyan, current.Value, "\033[0m")
 			}
-			return TrasformPrintStringWithColor(current.Value)
+			return TransformPrintStringWithColor(current.Value)
 		case reflect.Value:
 			switch current.Kind() {
 			case reflect.Bool:

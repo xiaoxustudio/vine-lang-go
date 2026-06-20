@@ -183,7 +183,7 @@ func (e *StoreObject) Set(name token.Token, val any) {
 	} else {
 		panic(verror.InterpreterVError{
 			Position: name.ToPosition(""),
-			Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
+			Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TransformPrintString(name.Value)),
 		})
 	}
 }
@@ -193,7 +193,7 @@ func (e *StoreObject) Define(name token.Token, val any) error {
 	if !tk.IsEmpty() {
 		return verror.InterpreterVError{
 			Position: name.ToPosition(""),
-			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
+			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TransformPrintString(name.Value)),
 		}
 	} else {
 		e.store[name.Value] = val
@@ -204,7 +204,7 @@ func (e *StoreObject) Define(name token.Token, val any) error {
 
 func (e *StoreObject) Print() {
 	for k, v := range e.store {
-		println(k, LibsUtils.TrasformPrintString(v))
+		println(k, LibsUtils.TransformPrintString(v))
 	}
 }
 

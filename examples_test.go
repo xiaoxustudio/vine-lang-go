@@ -14,7 +14,7 @@ import (
 	"vine-lang/vm"
 )
 
-var examplesDir = "example"
+var examplesDir = "examples"
 
 func TestExamples(t *testing.T) {
 	err := filepath.Walk(examplesDir, func(path string, info os.FileInfo, err error) error {

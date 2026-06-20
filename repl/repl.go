@@ -302,7 +302,7 @@ func (r *REPL) execute(code string) {
 	}
 
 	if result != nil {
-		fmt.Printf("%s", utils.TrasformPrintString(result))
+		fmt.Printf("%s", utils.TransformPrintString(result))
 		fmt.Println()
 	}
 }

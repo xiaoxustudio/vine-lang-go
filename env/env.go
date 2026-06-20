@@ -58,7 +58,6 @@ func New(workspace Workspace) *Environment {
 	}
 
 	lc := store.NewStoreObject()
-	lc.Define(token.Token{Type: token.IDENT, Value: "Test"}, "Test")
 	e.Define(token.Token{Type: token.IDENT, Value: "GLOBAL"}, lc)
 	return e
 }
@@ -113,7 +112,7 @@ func (e *Environment) Set(name Token, val any) {
 		if _, isConst := theEnv.consts[name.Value]; isConst {
 			panic(verror.InterpreterVError{
 				Position: name.ToPosition(e.FileName),
-				Message:  fmt.Sprintf("constant %s cannot be reassigned", LibsUtils.TrasformPrintString(name.Value)),
+				Message:  fmt.Sprintf("constant %s cannot be reassigned", LibsUtils.TransformPrintString(name.Value)),
 			})
 		}
 		theEnv.store[name.Value] = val
@@ -123,7 +122,7 @@ func (e *Environment) Set(name Token, val any) {
 		} else {
 			panic(verror.InterpreterVError{
 				Position: name.ToPosition(e.FileName),
-				Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
+				Message:  fmt.Sprintf("variable %s is not defined", LibsUtils.TransformPrintString(name.Value)),
 			})
 		}
 	}
@@ -141,7 +140,7 @@ func (e *Environment) Define(name Token, val any) error {
 	if !tk.IsEmpty() {
 		return verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
+			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TransformPrintString(name.Value)),
 		}
 	} else {
 		e.store[name.Value] = val
@@ -168,7 +167,7 @@ func (e *Environment) DefineConst(name Token, val any) {
 	if !tk.IsEmpty() {
 		panic(verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TrasformPrintString(name.Value)),
+			Message:  fmt.Sprintf("variable %s is already declared", LibsUtils.TransformPrintString(name.Value)),
 		})
 	} else {
 		e.store[name.Value] = val
@@ -184,7 +183,7 @@ func (e *Environment) Delete(name Token) {
 
 func (e *Environment) Print() {
 	for k, v := range e.store {
-		println(k, LibsUtils.TrasformPrintString(v))
+		println(k, LibsUtils.TransformPrintString(v))
 	}
 }
 
@@ -197,7 +196,7 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 		if fnValue.Kind() != reflect.Func {
 			return nil, verror.InterpreterVError{
 				Position: name.ToPosition(e.FileName),
-				Message:  fmt.Sprintf("variable %s is not a function", LibsUtils.TrasformPrintString(name.Value)),
+				Message:  fmt.Sprintf("variable %s is not a function", LibsUtils.TransformPrintString(name.Value)),
 			}
 		}
 
@@ -226,7 +225,7 @@ func (e *Environment) CallFunc(name Token, args []any) (any, error) {
 	} else {
 		return nil, verror.InterpreterVError{
 			Position: name.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("function %s is not defined", LibsUtils.TrasformPrintString(name.Value)),
+			Message:  fmt.Sprintf("function %s is not defined", LibsUtils.TransformPrintString(name.Value)),
 		}
 	}
 }
@@ -271,7 +270,7 @@ func (e *Environment) ImportModule(name string) (any, error) {
 	if err != nil {
 		return nil, verror.InterpreterVError{
 			Position: Token{}.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("failed to resolve absolute path for %s: %v", LibsUtils.TrasformPrintString(name), err),
+			Message:  fmt.Sprintf("failed to resolve absolute path for %s: %v", LibsUtils.TransformPrintString(name), err),
 		}
 	}
 
@@ -280,7 +279,7 @@ func (e *Environment) ImportModule(name string) (any, error) {
 		if imported == absPath {
 			return nil, verror.InterpreterVError{
 				Position: Token{}.ToPosition(e.FileName),
-				Message:  fmt.Sprintf("circular dependency detected: %s", LibsUtils.TrasformPrintString(name)),
+				Message:  fmt.Sprintf("circular dependency detected: %s", LibsUtils.TransformPrintString(name)),
 			}
 		}
 	}
@@ -303,12 +302,12 @@ func (e *Environment) ImportModule(name string) (any, error) {
 		if os.IsNotExist(err) {
 			return nil, verror.InterpreterVError{
 				Position: Token{}.ToPosition(e.FileName),
-				Message:  fmt.Sprintf("module %s is not defined or file not found", LibsUtils.TrasformPrintString(name)),
+				Message:  fmt.Sprintf("module %s is not defined or file not found", LibsUtils.TransformPrintString(name)),
 			}
 		}
 		return nil, verror.InterpreterVError{
 			Position: Token{}.ToPosition(e.FileName),
-			Message:  fmt.Sprintf("failed to read module %s: %v", LibsUtils.TrasformPrintString(name), err),
+			Message:  fmt.Sprintf("failed to read module %s: %v", LibsUtils.TransformPrintString(name), err),
 		}
 	}
 

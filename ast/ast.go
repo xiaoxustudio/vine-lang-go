@@ -454,10 +454,10 @@ func (o *ObjectExpr) NodeType() NodeType {
 // ArrayExpr
 type ArrayExpr struct {
 	BaseNode
-	Items []*Property
+	Items []Expr
 }
 
-func NewArrayExpr(items []*Property) *ArrayExpr {
+func NewArrayExpr(items []Expr) *ArrayExpr {
 	return &ArrayExpr{
 		BaseNode: BaseNode{Type: NodeTypeArrayExpr},
 		Items:    items,
